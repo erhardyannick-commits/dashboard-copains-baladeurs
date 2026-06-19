@@ -542,26 +542,46 @@ async function initMsal() {
     } catch(e2) { /* pas de redirect en cours */ }
 
     // ── CONNEXION SILENCIEUSE AUTOMATIQUE ──
-    // Si l'utilisateur est déjà connecté à Microsoft 365 dans ce navigateur,
-    // on tente de récupérer un token sans aucune interaction
-    const accounts = msalApp.getAllAccounts();
-    if (accounts.length > 0) {
-      try {
-        showLoading('Connexion automatique…', 'Récupération de votre session Microsoft');
-        const r = await msalApp.acquireTokenSilent({
-          scopes: GRAPH_SCOPE,
-          account: accounts[0]
-        });
+    // Tente d'abord ssoSilent (utilise la session Microsoft du navigateur)
+    // puis acquireTokenSilent si un compte est déjà connu
+    let silentOk = false;
+
+    // 1. Essai ssoSilent (fonctionne si l'utilisateur est connecté à M365 dans Chrome)
+    try {
+      showLoading('Connexion automatique…', 'Vérification de votre session Microsoft');
+      const loginHint = sessionStorage.getItem('cb_login_hint') || '';
+      const r = await msalApp.ssoSilent({
+        scopes: GRAPH_SCOPE,
+        loginHint: loginHint
+      });
+      if (r && r.accessToken) {
+        sessionStorage.setItem('cb_login_hint', r.account?.username || '');
         await loadData(r.accessToken);
-        return;
-      } catch(e3) {
-        hideLoading();
-        // Echec silencieux → l'utilisateur devra cliquer manuellement
+        silentOk = true;
+      }
+    } catch(e1) {
+      // ssoSilent échoué → essai acquireTokenSilent
+    }
+
+    if (!silentOk) {
+      // 2. Essai acquireTokenSilent si compte connu en mémoire MSAL
+      const accounts = msalApp.getAllAccounts();
+      if (accounts.length > 0) {
+        try {
+          const r = await msalApp.acquireTokenSilent({
+            scopes: GRAPH_SCOPE,
+            account: accounts[0]
+          });
+          sessionStorage.setItem('cb_login_hint', r.account?.username || '');
+          await loadData(r.accessToken);
+          silentOk = true;
+        } catch(e2) { /* échec → bouton manuel */ }
       }
     }
 
-    // Pas de session connue → on affiche le bouton normalement
-    hideLoading();
+    if (!silentOk) {
+      hideLoading();
+    }
 
   } catch(e) {
     console.error('MSAL init error:', e);
@@ -584,6 +604,7 @@ async function getToken() {
   }
   try {
     const r = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPE });
+    sessionStorage.setItem('cb_login_hint', r.account?.username || '');
     return r.accessToken;
   } catch(e) {
     throw new Error('Authentification annulée ou échouée : ' + e.message);
@@ -657,12 +678,6 @@ async function loadData(token) {
     }
 
     showLoading('Calcul des statistiques…', `${items.length} enregistrements chargés`);
-    // DEBUG — affiche les vrais noms de champs Graph API dans la console
-    if (items.length > 0) {
-      console.log('🔍 Champs dispo:', Object.keys(items[0].fields || {}));
-      console.log('🔍 Valeurs item 1:', JSON.stringify(items[0].fields, null, 2));
-      console.log('🔍 Valeurs item 2:', JSON.stringify(items[1]?.fields, null, 2));
-    }
     processAndRender(items);
     setAuthConnected(items.length);
 
