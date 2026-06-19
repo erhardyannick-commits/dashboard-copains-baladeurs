@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copains Baladeurs — Tableau de bord 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- MSAL pour authentification Azure AD — double CDN avec fallback -->
+<script>
+  // On tente d'abord jsdelivr, puis unpkg en fallback
+  window._msalLoaded = false;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"
+  onerror="document.getElementById('msal-fallback').src='https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js'">
+</script>
+<script id="msal-fallback"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap');
+:root {
+  --sp:    #00B4E3;
+  --sp-dk: #0090BB;
+  --sp-xl: #E3F7FD;
+  --g1: #00B4E3;
+  --g2: #0078D4; --g3: #00638A;
+  --g4: #5BC4E8; --g5: #A8DFF5; --g6: #003F6E;
+  --nR: #E04050; --nB: #0060C0; --nG: #2E8040;
+  --bg: #F3F6FA; --blanc: #FFFFFF; --gris-cl: #EBF0F5;
+  --gris-bd: #D0DCE8; --txt: #2C3E50; --txt-l: #6A7E8E;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Source Sans 3',sans-serif; background:var(--bg); color:var(--txt); }
+
+/* ── BANNIÈRE CONNEXION ── */
+#auth-bar {
+  background: linear-gradient(90deg, #003F6E, #0060C0);
+  color: #fff; padding: 10px 24px;
+  display: flex; align-items: center; gap: 14px;
+  font-size: 13px; flex-wrap: wrap;
+}
+#auth-bar.connected { background: linear-gradient(90deg, #1a5e2a, #2E8040); }
+#auth-bar.error     { background: linear-gradient(90deg, #7a1020, #E04050); }
+#auth-status { flex: 1; display:flex; align-items:center; gap:8px; }
+#auth-status .dot { width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.4); flex-shrink:0; }
+#auth-bar.connected .dot { background:#A0FFB0; }
+#auth-bar.error .dot     { background:#FFAAAA; }
+#btn-connect {
+  background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+  color: #fff; font-family:'Source Sans 3',sans-serif; font-weight:600;
+  font-size: 12px; padding: 6px 16px; border-radius: 6px; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+#btn-connect:hover { background: rgba(255,255,255,.35); }
+#btn-connect:disabled { opacity:.5; cursor:default; }
+#btn-refresh {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: #fff; font-family:'Source Sans 3',sans-serif; font-weight:600;
+  font-size: 12px; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  transition: all .15s; display:none;
+}
+#btn-refresh:hover { background: rgba(255,255,255,.28); }
+#last-update { font-size:11px; opacity:.7; }
+
+header {
+  background:linear-gradient(135deg,var(--sp-dk) 0%,var(--sp) 100%);
+  padding:20px 36px; display:flex; align-items:center; gap:18px;
+  box-shadow:0 3px 12px rgba(0,144,187,.35); position:relative; overflow:hidden;
+}
+header::before { content:''; position:absolute; right:-80px; top:-80px; width:280px; height:280px; border-radius:50%; background:rgba(255,255,255,.07); }
+.logo { width:52px; height:52px; background:#fff; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; color:var(--sp-dk); flex-shrink:0; box-shadow:0 3px 12px rgba(0,0,0,.15); z-index:1; }
+.h-info { z-index:1; }
+.h-info h1 { font-weight:700; font-size:22px; color:#fff; }
+.h-info p  { font-size:12px; color:rgba(255,255,255,.72); margin-top:2px; }
+#h-subtitle { font-size:12px; color:rgba(255,255,255,.72); margin-top:2px; }
+.h-tabs { display:flex; gap:5px; margin-left:auto; z-index:1; flex-wrap:wrap; }
+.tab { background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); color:#fff; font-family:'Source Sans 3',sans-serif; font-weight:600; font-size:12px; padding:6px 13px; border-radius:6px; cursor:pointer; transition:all .15s; white-space:nowrap; }
+.tab:hover { background:rgba(255,255,255,.3); }
+.tab.on { background:#fff; color:var(--sp-dk); border-color:#fff; }
+
+.page { display:none; }
+.page.on { display:block; }
+main { max-width:1280px; margin:0 auto; padding:26px 24px 52px; }
+
+.slbl { font-weight:700; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--sp-dk); margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+.slbl::after { content:''; flex:1; height:1px; background:var(--sp); opacity:.22; }
+
+.krow { display:grid; gap:12px; margin-bottom:20px; }
+.k4 { grid-template-columns:repeat(4,1fr); }
+.k5 { grid-template-columns:repeat(5,1fr); }
+.k3 { grid-template-columns:repeat(3,1fr); }
+
+.kpi { background:var(--blanc); border-radius:10px; padding:16px 14px 13px; box-shadow:0 1px 6px rgba(0,120,180,.08); border-left:4px solid var(--sp); transition:transform .13s; }
+.kpi:hover { transform:translateY(-2px); }
+.kpi.b2{border-left-color:var(--g2);} .kpi.b3{border-left-color:var(--g3);}
+.kpi.b4{border-left-color:var(--g4);} .kpi.b6{border-left-color:var(--g6);}
+.kpi.nr{border-left-color:var(--nR);} .kpi.ng{border-left-color:var(--nG);}
+.kpi.nb{border-left-color:var(--nB);} .kpi.gs{border-left-color:var(--txt-l);}
+.kico { font-size:20px; margin-bottom:7px; display:block; }
+.kval { font-weight:700; font-size:26px; line-height:1; color:var(--sp); }
+.kpi.b2 .kval{color:var(--g2);} .kpi.b3 .kval{color:var(--g3);}
+.kpi.b4 .kval{color:var(--g4);} .kpi.b6 .kval{color:var(--g6);}
+.kpi.nr .kval{color:var(--nR);} .kpi.ng .kval{color:var(--nG);}
+.kpi.nb .kval{color:var(--nB);} .kpi.gs .kval{color:var(--txt-l);}
+.kunit { font-size:12px; font-weight:600; opacity:.6; }
+.klbl  { font-size:11px; color:var(--txt-l); margin-top:4px; }
+
+.g2 { display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-bottom:18px; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
+.g1 { margin-bottom:18px; }
+
+.card { background:var(--blanc); border-radius:10px; padding:18px 18px 14px; box-shadow:0 1px 6px rgba(0,120,180,.08); }
+.card h3 { font-weight:700; font-size:12px; color:var(--txt); margin-bottom:12px; line-height:1.3; }
+.card canvas { max-height:200px; }
+.card.tall canvas { max-height:230px; }
+
+.th { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg,var(--sp-dk),var(--sp)); border-radius:10px; padding:16px 20px; margin-bottom:18px; box-shadow:0 3px 10px rgba(0,144,187,.22); }
+.th-ico { font-size:32px; }
+.th-txt h2 { font-weight:700; font-size:18px; color:#fff; }
+.th-txt p  { font-size:12px; color:rgba(255,255,255,.72); margin-top:2px; }
+
+/* ── Groupes Nordique ── */
+.ng-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:18px; }
+.ng-card { background:var(--blanc); border-radius:10px; padding:16px; box-shadow:0 1px 6px rgba(0,120,180,.08); }
+.ng-card.nr { border-top:3px solid var(--nR); }
+.ng-card.nb { border-top:3px solid var(--nB); }
+.ng-card.ng { border-top:3px solid var(--nG); }
+.ng-title { display:flex; align-items:center; gap:8px; margin-bottom:12px; font-weight:700; font-size:13px; }
+.ng-title.nr{color:var(--nR);} .ng-title.nb{color:var(--nB);} .ng-title.ng{color:var(--nG);}
+.ng-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ng-stat-val { font-weight:700; font-size:20px; line-height:1; }
+.ng-stat-lbl { font-size:10px; color:var(--txt-l); margin-top:2px; }
+.nr .ng-stat-val{color:var(--nR);} .nb .ng-stat-val{color:var(--nB);} .ng .ng-stat-val{color:var(--nG);}
+
+.nbadge { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:6px; font-size:11px; font-weight:700; margin:3px; }
+.nbadge.nr{background:#FDDCDC;color:#801010;} .nbadge.nb{background:#D5E4FF;color:#002880;} .nbadge.ng{background:#D8F0D8;color:#105010;}
+.dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+.dbadge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; margin:3px; }
+.dbadge.tf{background:#D5EEF8;color:#005A80;} .dbadge.fa{background:#D5EDF0;color:#005060;}
+.dbadge.mo{background:#D5E4F5;color:#003880;} .dbadge.di{background:#D5DCF8;color:#002080;}
+
+/* ── Sortie culturelle ── */
+.cult-empty { text-align:center; padding:40px 20px; }
+.cult-empty .cult-ico { font-size:52px; margin-bottom:16px; display:block; }
+.cult-empty h3 { font-weight:700; font-size:16px; color:var(--sp-dk); margin-bottom:8px; }
+.cult-empty p  { font-size:13px; color:var(--txt-l); max-width:480px; margin:0 auto; line-height:1.6; }
+.cult-notice { background:var(--sp-xl); border:1px solid var(--sp); border-radius:8px; padding:14px 18px; margin-top:20px; font-size:12px; color:var(--sp-dk); display:flex; align-items:flex-start; gap:10px; }
+.cult-notice strong { display:block; margin-bottom:3px; font-size:13px; }
+.cult-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; margin-top:20px; }
+.cult-col-hdr { font-weight:700; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--sp-dk); padding-bottom:8px; border-bottom:2px solid var(--sp); margin-bottom:10px; }
+.cult-field { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--gris-cl); font-size:12px; }
+.cult-field:last-child { border-bottom:none; }
+.cult-field-ico { font-size:16px; flex-shrink:0; }
+.cult-field-lbl { color:var(--txt-l); min-width:90px; }
+.cult-field-val { font-weight:600; color:var(--txt); }
+
+/* ── Spinner chargement ── */
+.loading-overlay {
+  position:fixed; inset:0; background:rgba(243,246,250,.88);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:100; gap:16px;
+}
+.spinner {
+  width:42px; height:42px; border:4px solid var(--gris-bd);
+  border-top-color:var(--sp); border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-msg { font-weight:600; font-size:14px; color:var(--sp-dk); }
+.loading-sub { font-size:12px; color:var(--txt-l); }
+
+footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; margin-top:30px; padding-top:16px; border-top:1px solid var(--gris-bd); }
+
+@media(max-width:900px){
+  .k4,.k5,.k3,.ng-grid,.cult-cols { grid-template-columns:repeat(2,1fr); }
+  .g2,.g3 { grid-template-columns:1fr; }
+  .h-tabs { display:none; }
+  main { padding:14px 12px 40px; }
+  #auth-bar { padding:8px 14px; font-size:12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Overlay chargement -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loading-msg">Connexion en cours…</div>
+  <div class="loading-sub" id="loading-sub">Vérification de votre session Microsoft</div>
+</div>
+
+<!-- Barre de connexion -->
+<div id="auth-bar">
+  <div id="auth-status">
+    <div class="dot"></div>
+    <span id="auth-status-text">Connexion à SharePoint en cours…</span>
+  </div>
+  <span id="last-update"></span>
+  <button id="btn-refresh" onclick="loadData()">🔄 Actualiser</button>
+  <button id="btn-connect" onclick="connectAndLoad()" disabled>🔐 Connexion en cours…</button>
+</div>
+
+<header>
+  <div class="logo">CB</div>
+  <div class="h-info">
+    <h1>Copains Baladeurs</h1>
+    <p id="h-subtitle">Tableau de bord · Jan–Juin 2026 · données statiques</p>
+  </div>
+  <div class="h-tabs">
+    <button class="tab on"  onclick="nav(this,'global')">🏠 Vue globale</button>
+    <button class="tab" onclick="nav(this,'rando')">🥾 Randonnée</button>
+    <button class="tab" onclick="nav(this,'nordic')">🚶 Marche Nordique</button>
+    <button class="tab" onclick="nav(this,'baton')">🎯 Bâtons Dyn.</button>
+    <button class="tab" onclick="nav(this,'velo')">🚴 Vélo</button>
+    <button class="tab" onclick="nav(this,'cult')">🏛 Sorties Culturelles</button>
+    <button class="tab" onclick="nav(this,'vie')">📋 Vie Asso</button>
+  </div>
+</header>
+
+<!-- ══ VUE GLOBALE ══ -->
+<div class="page on" id="pg-global"><main>
+  <div class="slbl">Chiffres clés — saison en cours</div>
+  <div class="krow k4">
+    <div class="kpi"><span class="kico">🎒</span><div class="kval" id="k-jours">…</div><div class="klbl">Jours d'activité (séances uniques)</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="k-dist">…</div><div class="klbl">Distance totale parcourue</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="k-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi b6"><span class="kico">🤝</span><div class="kval" id="k-benev">…</div><div class="klbl">Heures de bénévolat</div></div>
+  </div>
+
+  <div class="slbl">Par type d'activité</div>
+  <div class="krow k5">
+    <div class="kpi"><span class="kico">🚶</span><div class="kval" id="k-nordic-s">…</div><div class="klbl">Marche Nordique</div></div>
+    <div class="kpi b2"><span class="kico">🥾</span><div class="kval" id="k-rando-s">…</div><div class="klbl">Animation Randonnée</div></div>
+    <div class="kpi b3"><span class="kico">🎯</span><div class="kval" id="k-baton-s">…</div><div class="klbl">Bâtons Dynamiques</div></div>
+    <div class="kpi b6"><span class="kico">🚴</span><div class="kval" id="k-velo-s">…</div><div class="klbl">Vélotourisme</div></div>
+    <div class="kpi gs"><span class="kico">🏛</span><div class="kval" id="k-cult-s">…</div><div class="klbl">Sorties culturelles</div></div>
+  </div>
+
+  <div class="slbl">Participation</div>
+  <div class="g3">
+    <div class="card"><h3>Participants cumulés par type</h3><canvas id="g-partic"></canvas></div>
+    <div class="card"><h3>Répartition des activités</h3><canvas id="g-donut"></canvas></div>
+    <div class="card"><h3>Distance & dénivelé par type</h3><canvas id="g-dist"></canvas></div>
+  </div>
+
+  <div class="slbl">Participants par mois — toutes activités</div>
+  <div class="g1">
+    <div class="card"><h3>Participants par mois et par type d'activité</h3><canvas id="g-partic-month" style="max-height:200px"></canvas></div>
+  </div>
+
+  <footer>Copains Baladeurs · FFRandonnée · Données SharePoint · Jan–Juin 2026</footer>
+</main></div>
+
+<!-- ══ RANDONNÉE ══ -->
+<div class="page" id="pg-rando"><main>
+  <div class="th"><div class="th-ico">🥾</div><div class="th-txt"><h2>Animation Randonnée</h2><p>Sorties pédestres · Jan–Juin 2026</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k5">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="r-sorties">…</div><div class="klbl">Sorties organisées</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="r-dist">…</div><div class="klbl">Distance totale</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="r-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi b6"><span class="kico">👥</span><div class="kval" id="r-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b4"><span class="kico">👤</span><div class="kval" id="r-moy">…</div><div class="klbl">Participants / sortie</div></div>
+  </div>
+
+  <div class="slbl">Moyennes par sortie</div>
+  <div class="krow k4">
+    <div class="kpi b2"><span class="kico">🗺</span><div class="kval" id="r-dist-moy">…</div><div class="klbl">Distance moyenne</div></div>
+    <div class="kpi b3"><span class="kico">📐</span><div class="kval" id="r-deniv-moy">…</div><div class="klbl">Dénivelé moyen</div></div>
+    <div class="kpi b6"><span class="kico">⏱</span><div class="kval">4h08</div><div class="klbl">Durée moyenne</div></div>
+    <div class="kpi"><span class="kico">✅</span><div class="kval" id="r-pct-facile">…</div><div class="klbl">Sorties "Facile"</div></div>
+  </div>
+
+  <div class="slbl">Analyse</div>
+  <div class="g3">
+    <div class="card tall"><h3>Participants par mois</h3><canvas id="r-partic-month"></canvas></div>
+    <div class="card tall">
+      <h3>Répartition par difficulté</h3>
+      <canvas id="r-diff"></canvas>
+      <div style="margin-top:10px" id="r-diff-badges">
+        <span class="dbadge tf">Très facile · 3</span>
+        <span class="dbadge fa">Facile · 12</span>
+        <span class="dbadge mo">Moyen · 8</span>
+        <span class="dbadge di">Difficile · 1</span>
+      </div>
+    </div>
+    <div class="card tall"><h3>Distance & dénivelé cumulés par mois</h3><canvas id="r-dist-deniv"></canvas></div>
+  </div>
+</main></div>
+
+<!-- ══ MARCHE NORDIQUE ══ -->
+<div class="page" id="pg-nordic"><main>
+  <div class="th"><div class="th-ico">🚶</div><div class="th-txt"><h2>Marche Nordique</h2><p>3 groupes de niveaux · Jan–Juin 2026</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k5">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="n-seances">…</div><div class="klbl">Séances uniques (dédupliquées)</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="n-dist">…</div><div class="klbl">Distance totale (3 groupes)</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="n-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi b6"><span class="kico">👥</span><div class="kval" id="n-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b4"><span class="kico">👤</span><div class="kval" id="n-moy">…</div><div class="klbl">Participants / séance (par groupe)</div></div>
+  </div>
+
+  <!-- ORDRE CORRIGÉ : Vert / Bleu / Rouge -->
+  <div class="slbl">Par groupe de niveau</div>
+  <div class="ng-grid">
+    <div class="ng-card ng">
+      <div class="ng-title ng">🟢 Vert — Débutants</div>
+      <div class="ng-stats ng">
+        <div><div class="ng-stat-val" id="nG-seances">…</div><div class="ng-stat-lbl">séances</div></div>
+        <div><div class="ng-stat-val" id="nG-dist">…</div><div class="ng-stat-lbl">distance moy.</div></div>
+        <div><div class="ng-stat-val" id="nG-deniv">…</div><div class="ng-stat-lbl">dénivelé moy.</div></div>
+        <div><div class="ng-stat-val" id="nG-part">…</div><div class="ng-stat-lbl">participants moy.</div></div>
+      </div>
+    </div>
+    <div class="ng-card nb">
+      <div class="ng-title nb">🔵 Bleu — Intermédiaires</div>
+      <div class="ng-stats nb">
+        <div><div class="ng-stat-val" id="nB-seances">…</div><div class="ng-stat-lbl">séances</div></div>
+        <div><div class="ng-stat-val" id="nB-dist">…</div><div class="ng-stat-lbl">distance moy.</div></div>
+        <div><div class="ng-stat-val" id="nB-deniv">…</div><div class="ng-stat-lbl">dénivelé moy.</div></div>
+        <div><div class="ng-stat-val" id="nB-part">…</div><div class="ng-stat-lbl">participants moy.</div></div>
+      </div>
+    </div>
+    <div class="ng-card nr">
+      <div class="ng-title nr">🔴 Rouge — Confirmés</div>
+      <div class="ng-stats nr">
+        <div><div class="ng-stat-val" id="nR-seances">…</div><div class="ng-stat-lbl">séances</div></div>
+        <div><div class="ng-stat-val" id="nR-dist">…</div><div class="ng-stat-lbl">distance moy.</div></div>
+        <div><div class="ng-stat-val" id="nR-deniv">…</div><div class="ng-stat-lbl">dénivelé moy.</div></div>
+        <div><div class="ng-stat-val" id="nR-part">…</div><div class="ng-stat-lbl">participants moy.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slbl">Participants par mois</div>
+  <div class="g2">
+    <div class="card tall"><h3>Participants par mois et par groupe</h3><canvas id="n-partic-month"></canvas></div>
+    <div class="card">
+      <h3>Répartition des séances par groupe</h3>
+      <canvas id="n-donut"></canvas>
+      <div style="margin-top:10px;text-align:center">
+        <span class="nbadge ng"><span class="dot" style="background:var(--nG)"></span>Vert · <span id="badge-nG">…</span> séances · Débutants</span>
+        <span class="nbadge nb"><span class="dot" style="background:var(--nB)"></span>Bleu · <span id="badge-nB">…</span> séances · Interméd.</span>
+        <span class="nbadge nr"><span class="dot" style="background:var(--nR)"></span>Rouge · <span id="badge-nR">…</span> séances · Confirmés</span>
+      </div>
+    </div>
+  </div>
+</main></div>
+
+<!-- ══ BÂTONS ══ -->
+<div class="page" id="pg-baton"><main>
+  <div class="th"><div class="th-ico">🎯</div><div class="th-txt"><h2>Bâtons Dynamiques</h2><p>Séances de gym avec bâtons · Jan–Juin 2026</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k4">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="b-seances">…</div><div class="klbl">Séances uniques (dédupliquées)</div></div>
+    <div class="kpi b2"><span class="kico">👥</span><div class="kval" id="b-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b3"><span class="kico">👤</span><div class="kval" id="b-moy">…</div><div class="klbl">Participants / séance</div></div>
+    <div class="kpi b6"><span class="kico">⏱</span><div class="kval">1h30<span class="kunit"> moy.</span></div><div class="klbl">Durée moyenne</div></div>
+  </div>
+
+  <div class="slbl">Analyse</div>
+  <div class="g2">
+    <div class="card tall"><h3>Participants par mois</h3><canvas id="b-partic-month"></canvas></div>
+    <div class="card tall"><h3>Séances par lieu</h3><canvas id="b-lieux"></canvas></div>
+  </div>
+</main></div>
+
+<!-- ══ VÉLO ══ -->
+<div class="page" id="pg-velo"><main>
+  <div class="th"><div class="th-ico">🚴</div><div class="th-txt"><h2>Sortie Vélotourisme</h2><p>Sorties à vélo · Jan–Juin 2026</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k4">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="v-sorties-k">…</div><div class="klbl">Sorties organisées</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="v-dist">…</div><div class="klbl">Distance totale</div></div>
+    <div class="kpi b3"><span class="kico">👥</span><div class="kval" id="v-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b6"><span class="kico">🗺</span><div class="kval" id="v-dist-moy">…</div><div class="klbl">Distance moy. / sortie</div></div>
+  </div>
+
+  <div class="slbl">Analyse</div>
+  <div class="g2">
+    <div class="card tall"><h3>Participants par mois</h3><canvas id="v-partic-month"></canvas></div>
+    <div class="card tall"><h3>Participants par sortie</h3><canvas id="v-sorties"></canvas></div>
+  </div>
+</main></div>
+
+<!-- ══ SORTIES CULTURELLES ══ -->
+<div class="page" id="pg-cult"><main>
+  <div class="th"><div class="th-ico">🏛</div><div class="th-txt"><h2>Sorties Culturelles</h2><p>Visites patrimoine & découvertes · Jan–Juin 2026</p></div></div>
+
+  <div class="card" id="cult-content">
+    <div class="cult-empty">
+      <span class="cult-ico">🗺</span>
+      <h3>Données à compléter dans la Microsoft List</h3>
+      <p>Les sorties culturelles de la saison ne sont pas encore saisies dans la liste globale. Une fois ajoutées, elles apparaîtront ici automatiquement.</p>
+      <div class="cult-notice">
+        <span style="font-size:18px;flex-shrink:0">ℹ️</span>
+        <div>
+          <strong>Champs à renseigner dans la List</strong>
+          Pour chaque sortie : date · lieu de visite · lieu de randonnée · distance rando · dénivelé · nombre de participants · descriptif
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--gris-cl)">
+      <div style="font-weight:700;font-size:12px;color:var(--sp-dk);margin-bottom:14px;letter-spacing:1px;text-transform:uppercase">Structure attendue — exemple de sortie</div>
+      <div class="cult-cols">
+        <div>
+          <div class="cult-col-hdr">Visite</div>
+          <div class="cult-field"><span class="cult-field-ico">🏛</span><span class="cult-field-lbl">Lieu visite</span><span class="cult-field-val">Ex : Château de Bourlémont</span></div>
+          <div class="cult-field"><span class="cult-field-ico">📝</span><span class="cult-field-lbl">Descriptif</span><span class="cult-field-val">Visite guidée, conférence…</span></div>
+          <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">Nombre de personnes</span></div>
+        </div>
+        <div>
+          <div class="cult-col-hdr">Randonnée associée</div>
+          <div class="cult-field"><span class="cult-field-ico">📍</span><span class="cult-field-lbl">Lieu départ</span><span class="cult-field-val">Commune de départ</span></div>
+          <div class="cult-field"><span class="cult-field-ico">📏</span><span class="cult-field-lbl">Distance</span><span class="cult-field-val">km parcourus</span></div>
+          <div class="cult-field"><span class="cult-field-ico">⛰</span><span class="cult-field-lbl">Dénivelé</span><span class="cult-field-val">m de dénivelé +</span></div>
+        </div>
+        <div>
+          <div class="cult-col-hdr">Général</div>
+          <div class="cult-field"><span class="cult-field-ico">📅</span><span class="cult-field-lbl">Date</span><span class="cult-field-val">Date de la sortie</span></div>
+          <div class="cult-field"><span class="cult-field-ico">⏱</span><span class="cult-field-lbl">Durée</span><span class="cult-field-val">Durée totale</span></div>
+          <div class="cult-field"><span class="cult-field-ico">🤝</span><span class="cult-field-lbl">Bénévolat</span><span class="cult-field-val">Heures organisateur</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main></div>
+
+<!-- ══ VIE ASSO ══ -->
+<div class="page" id="pg-vie"><main>
+  <div class="th"><div class="th-ico">📋</div><div class="th-txt"><h2>Vie de l'association</h2><p>Tâches, réunions, bénévolat · Jan–Juin 2026</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k4">
+    <div class="kpi gs"><span class="kico">📋</span><div class="kval" id="vie-actions">…</div><div class="klbl">Enregistrements vie asso</div></div>
+    <div class="kpi b2"><span class="kico">🤝</span><div class="kval" id="vie-benev-h">…</div><div class="klbl">Bénévolat vie asso</div></div>
+    <div class="kpi b3"><span class="kico">🚗</span><div class="kval" id="vie-km-asso">…</div><div class="klbl">Déplacements vie asso</div></div>
+    <div class="kpi b6"><span class="kico">🗺</span><div class="kval" id="vie-km-total">…</div><div class="klbl">Déplacements toutes activités</div></div>
+  </div>
+
+  <div class="slbl">Bénévolat & déplacements par type d'activité</div>
+  <div class="g2">
+    <div class="card tall"><h3>Heures de bénévolat par type</h3><canvas id="vie-benev"></canvas></div>
+    <div class="card tall"><h3>Kilomètres de déplacements par type</h3><canvas id="vie-km"></canvas></div>
+  </div>
+
+  <footer>Copains Baladeurs · FFRandonnée · Données SharePoint · Jan–Juin 2026</footer>
+</main></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG AZURE AD + SHAREPOINT
+// ══════════════════════════════════════════
+const MSAL_CONFIG = {
+  auth: {
+    clientId: '748f8a5b-2407-46ae-9ed4-135064583f02',
+    authority: 'https://login.microsoftonline.com/8d01b93c-683b-4710-b1a5-3b5441b836ff',
+    redirectUri: 'https://erhardyannick-commits.github.io/dashboard-copains-baladeurs',
+  },
+  cache: {
+    cacheLocation: 'sessionStorage',
+    storeAuthStateInCookie: false
+  }
+};
+
+const SP_HOSTNAME  = 'copainsbaladeurs.sharepoint.com';
+const SP_SITE_PATH = '/sites/doc';
+const LIST_NAME    = 'Liste globale';
+const GRAPH_SCOPE  = ['https://graph.microsoft.com/Sites.Read.All'];
+
+let msalApp   = null;
+let msalReady = false;
+let allCharts = {};
+
+// Vérification que MSAL est bien chargé
+function checkMsalLoaded() {
+  // MSAL v3 expose msalBrowser, v2 expose msal
+  const lib = window.msalBrowser || window.msal;
+  if (!lib || !lib.PublicClientApplication) {
+    console.error('MSAL non disponible, lib =', lib);
+    document.getElementById('auth-status-text').textContent =
+      'Bibliothèque MSAL introuvable — vérifiez votre connexion internet';
+    return null;
+  }
+  return lib;
+}
+
+// ══════════════════════════════════════════
+//  COULEURS GRAPHIQUES
+// ══════════════════════════════════════════
+const C = {
+  g1:'#00B4E3', g2:'#1A3C8B', g3:'#00C4A0',
+  g4:'#0050C8', g5:'#74C2E8', g6:'#5C7AB0',
+  nR:'#E04050', nB:'#0060C0', nG:'#2E8040',
+};
+function a(hex,op){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${op})`;
+}
+Chart.defaults.font.family="'Source Sans 3',sans-serif";
+Chart.defaults.color='#5A6E7E';
+Chart.defaults.plugins.legend.labels.boxWidth=10;
+Chart.defaults.plugins.legend.labels.font={size:11};
+const OY={beginAtZero:true,grid:{color:'rgba(0,120,180,.07)'}};
+const OX={grid:{display:false}};
+const M=['Jan','Fév','Mar','Avr','Mai','Juin'];
+
+// ══════════════════════════════════════════
+//  INIT MSAL
+// ══════════════════════════════════════════
+async function initMsal() {
+  try {
+    const lib = checkMsalLoaded();
+    if (!lib) return;
+
+    msalApp = new lib.PublicClientApplication(MSAL_CONFIG);
+
+    if (typeof msalApp.initialize === 'function') {
+      await msalApp.initialize();
+    }
+
+    msalReady = true;
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = false;
+    btn.textContent = '🔐 Se connecter à SharePoint';
+
+    // Gestion du retour de redirection
+    try {
+      const handleRedirect = msalApp.handleRedirectPromise
+        ? msalApp.handleRedirectPromise.bind(msalApp)
+        : null;
+      if (handleRedirect) {
+        const resp = await handleRedirect();
+        if (resp && resp.accessToken) {
+          await loadData(resp.accessToken);
+          return;
+        }
+      }
+    } catch(e2) { /* pas de redirect en cours */ }
+
+    // ── CONNEXION SILENCIEUSE AUTOMATIQUE ──
+    // Si l'utilisateur est déjà connecté à Microsoft 365 dans ce navigateur,
+    // on tente de récupérer un token sans aucune interaction
+    const accounts = msalApp.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        showLoading('Connexion automatique…', 'Récupération de votre session Microsoft');
+        const r = await msalApp.acquireTokenSilent({
+          scopes: GRAPH_SCOPE,
+          account: accounts[0]
+        });
+        await loadData(r.accessToken);
+        return;
+      } catch(e3) {
+        hideLoading();
+        // Echec silencieux → l'utilisateur devra cliquer manuellement
+      }
+    }
+
+    // Pas de session connue → on affiche le bouton normalement
+    hideLoading();
+
+  } catch(e) {
+    console.error('MSAL init error:', e);
+    document.getElementById('auth-status-text').textContent =
+      'Erreur MSAL : ' + e.message;
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = false;
+    btn.textContent = '🔐 Se connecter à SharePoint';
+  }
+}
+
+async function getToken() {
+  if (!msalApp) throw new Error('MSAL non initialisé — rechargez la page');
+  const accounts = msalApp.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const r = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] });
+      return r.accessToken;
+    } catch(e) { /* silent fail → popup */ }
+  }
+  try {
+    const r = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPE });
+    return r.accessToken;
+  } catch(e) {
+    throw new Error('Authentification annulée ou échouée : ' + e.message);
+  }
+}
+
+async function connectAndLoad() {
+  if (!msalApp) {
+    setAuthError('MSAL non chargé — rechargez la page');
+    return;
+  }
+  document.getElementById('btn-connect').disabled = true;
+  showLoading('Connexion Microsoft…', 'Fenêtre de connexion en cours d\'ouverture');
+  try {
+    const token = await getToken();
+    await loadData(token);
+  } catch(e) {
+    setAuthError(e.message);
+  } finally {
+    document.getElementById('btn-connect').disabled = false;
+    hideLoading();
+  }
+}
+
+// ══════════════════════════════════════════
+//  CHARGEMENT DONNÉES SHAREPOINT
+// ══════════════════════════════════════════
+async function loadData(token) {
+  if (!token) {
+    try { token = await getToken(); }
+    catch(e) { setAuthError(e.message); return; }
+  }
+  showLoading('Connexion à SharePoint…', 'Récupération de la Microsoft List');
+  try {
+    // 1. Trouver le site
+    const siteResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (!siteResp.ok) throw new Error('Site SharePoint introuvable (vérifiez les droits Sites.Read.All)');
+    const siteData = await siteResp.json();
+    const siteId = siteData.id;
+
+    // 2. Trouver la liste
+    const listsResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$filter=displayName eq '${encodeURIComponent(LIST_NAME)}'`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    const listsData = await listsResp.json();
+    if (!listsData.value || listsData.value.length === 0)
+      throw new Error(`Liste "${LIST_NAME}" introuvable sur ce site`);
+    const listId = listsData.value[0].id;
+
+    // 3. Charger tous les items avec tous les champs (pagination)
+    showLoading('Chargement des données…', 'Lecture de la Liste globale');
+    let items = [];
+    // On demande tous les champs field_3 à field_51 explicitement
+    const fields = ['field_3','field_4','field_5','field_6','field_7','field_8','field_9','field_10',
+      'field_11','field_12','field_13','field_14','field_15','field_16','field_17','field_18','field_19',
+      'field_20','field_21','field_22','field_23','field_24','field_25','field_26','field_27','field_28',
+      'field_29','field_30','field_31','field_32','field_33','field_34','field_35','field_36','field_37',
+      'field_38','field_39','field_40','field_41','field_42','field_43','field_44','field_45','field_46',
+      'field_47','field_48','field_49','field_50','field_51','Title'].join(',');
+    let url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields($select=${fields})&$top=999`;
+    while (url) {
+      const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) throw new Error('Erreur lecture des items : ' + r.status);
+      const d = await r.json();
+      items = items.concat(d.value || []);
+      url = d['@odata.nextLink'] || null;
+    }
+
+    showLoading('Calcul des statistiques…', `${items.length} enregistrements chargés`);
+    // DEBUG — affiche les vrais noms de champs Graph API dans la console
+    if (items.length > 0) {
+      console.log('🔍 Champs dispo:', Object.keys(items[0].fields || {}));
+      console.log('🔍 Valeurs item 1:', JSON.stringify(items[0].fields, null, 2));
+      console.log('🔍 Valeurs item 2:', JSON.stringify(items[1]?.fields, null, 2));
+    }
+    processAndRender(items);
+    setAuthConnected(items.length);
+
+  } catch(e) {
+    console.error(e);
+    setAuthError(e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ══════════════════════════════════════════
+//  TRAITEMENT DES DONNÉES
+// ══════════════════════════════════════════
+function processAndRender(items) {
+  const rows = items.map(i => {
+    const f = i.fields || {};
+
+    const gn = (key) => {
+      const v = f[key];
+      if (v === undefined || v === null || v === '') return 0;
+      return parseFloat(v.toString().replace(',', '.')) || 0;
+    };
+    const gs = (key) => (f[key] || '').toString().trim();
+
+    // Mapping confirmé par debug console :
+    // field_3  = Date activité (ISO)
+    // field_4  = Catégorie ("Activité Copains Baladeurs" / "Vie de l'association")
+    // field_5  = Type activité ("Marche Nordique", "Animation Randonnée", etc.)
+    // field_6  = Rando distance
+    // field_7  = Rando durée
+    // field_8  = Rando dénivelé
+    // field_9  = Rando difficulté
+    // field_10 = Rando participants
+    // field_11 = Rando commentaire
+    // field_12 = Bâtons lieu
+    // field_13 = Bâtons participants
+    // field_14 = Bâtons distance
+    // field_15 = Bâtons durée
+    // field_16 = Bâtons commentaires
+    // field_17 = Nordique couleur (Bleu/Vert/Rouge)
+    // field_18 = Nordique distance
+    // field_19 = Nordique dénivelé
+    // field_20 = Nordique participants
+    // field_21 = Nordique liste noms
+    // field_22 = Nordique commentaires
+    // field_23 = RandoVisite descriptif
+    // field_24 = RandoVisite Rando distance
+    // field_25 = RandoVisite Rando durée
+    // field_26 = RandoVisite Rando dénivelé
+    // field_27 = RandoVisite Rando lieu
+    // field_28 = RandoVisite Rando participants
+    // field_29 = RandoVisite Visite lieu
+    // field_30 = RandoVisite Visite descriptif
+    // field_31 = RandoVisite Visite participants
+    // field_32 = Vélo distance
+    // field_33 = Vélo durée
+    // field_34 = Vélo dénivelé
+    // field_35 = Vélo participants
+    // field_36 = Vélo commentaires
+    // field_50 = Déplacements distance
+    // field_51 = Bénévolat temps
+
+    const date      = gs('field_3');   // "2026-01-02T23:00:00Z"
+    const categorie = gs('field_4');   // "Activité Copains Baladeurs"
+    const typeAct   = gs('field_5');   // "Marche Nordique"
+    const groupe    = gs('field_17');  // "Bleu" / "Vert" / "Rouge"
+
+    const typeNorm = typeAct.toLowerCase();
+    let distance = 0, denivele = 0, participants = 0, difficulte = '';
+
+    if (typeNorm.includes('nordique')) {
+      distance     = gn('field_18');
+      denivele     = gn('field_19');
+      participants = gn('field_20');
+    } else if (typeNorm.includes('animation') || (typeNorm.includes('rand') && !typeNorm.includes('visite'))) {
+      distance     = gn('field_6');
+      denivele     = gn('field_8');
+      participants = gn('field_10');
+      difficulte   = gs('field_9');
+    } else if (typeNorm.includes('b\u00e2ton') || typeNorm.includes('baton')) {
+      distance     = gn('field_14');
+      participants = gn('field_13');
+    } else if (typeNorm.includes('v\u00e9lo') || typeNorm.includes('velo') || typeNorm.includes('lotourisme')) {
+      distance     = gn('field_32');
+      denivele     = gn('field_34');
+      participants = gn('field_35');
+    } else if (typeNorm.includes('visite') || typeNorm.includes('culturel') || typeNorm.includes('randovisite')) {
+      distance     = gn('field_24');
+      denivele     = gn('field_26');
+      participants = gn('field_28');
+    }
+
+    return {
+      type:        typeAct,
+      categorie:   categorie,
+      date:        date,
+      groupe:      groupe,
+      distance,
+      denivele,
+      participants,
+      benevolat:   gn('field_51'),
+      deplacement: gn('field_50'),
+      lieu:        gs('field_12'),
+      difficulte,
+    };
+  });
+
+  // ── Filtrage valeur aberrante (75km Nordique Vert 04/04) ──
+  const filtered = rows.map(r => {
+    if (r.type.toLowerCase().includes('nordique') &&
+        r.groupe.toLowerCase() === 'vert' &&
+        r.distance > 30) {
+      return {...r, distance: r.distance / 10};
+    }
+    return r;
+  });
+
+  // ── Helpers type (basés sur les vrais noms SharePoint) ──
+  const isRando  = r => /animation.rand/i.test(r.type);
+  const isNordic = r => /nordique/i.test(r.type);
+  const isBaton  = r => /b.ton/i.test(r.type);
+  const isVelo   = r => /v.lo|lotourisme/i.test(r.type);
+  const isCult   = r => /culturel|visite|randovisite/i.test(r.type);
+  const isVie    = r => /vie.*asso/i.test(r.categorie);
+
+  const randoRows  = filtered.filter(isRando);
+  const nordicRows = filtered.filter(isNordic);
+  const batonRows  = filtered.filter(isBaton);
+  const veloRows   = filtered.filter(isVelo);
+  const cultRows   = filtered.filter(isCult);
+  const vieRows    = filtered.filter(isVie);
+
+  // ── Déduplification séances nordique (date+type unique) ──
+  const nordicDates = [...new Set(nordicRows.map(r => r.date.slice(0,10)))];
+  const randoDates  = [...new Set(randoRows.map(r => r.date.slice(0,10)))];
+  const batonDates  = [...new Set(batonRows.map(r => r.date.slice(0,10)))];
+  const veloDates   = [...new Set(veloRows.map(r => r.date.slice(0,10)))];
+
+  // ── Sous-groupes Nordique ──
+  const nVert  = nordicRows.filter(r => /vert/i.test(r.groupe));
+  const nBleu  = nordicRows.filter(r => /bleu/i.test(r.groupe));
+  const nRouge = nordicRows.filter(r => /rouge/i.test(r.groupe));
+  const nVertDates  = [...new Set(nVert.map(r => r.date.slice(0,10)))];
+  const nBleuDates  = [...new Set(nBleu.map(r => r.date.slice(0,10)))];
+  const nRougeDates = [...new Set(nRouge.map(r => r.date.slice(0,10)))];
+
+  const sum = (arr, key) => arr.reduce((s,r) => s + (r[key]||0), 0);
+  const avg = (arr, key) => arr.length ? (sum(arr,key)/arr.length) : 0;
+
+  // ── GLOBALE ──
+  const totalDist  = sum(randoRows,'distance') + sum(nordicRows,'distance') + sum(veloRows,'distance');
+  const totalDeniv = sum(randoRows,'denivele') + sum(nordicRows,'denivele');
+  const totalJours = new Set([...nordicDates,...randoDates,...batonDates,...veloDates]).size;
+  const totalBenev = sum(filtered,'benevolat');
+  const totalParticNordic = sum(nordicDates.map(d => {
+    const dayRows = nordicRows.filter(r => r.date.slice(0,10) === d);
+    return {participants: sum(dayRows,'participants')};
+  }), 'participants');
+  const totalParticRando  = sum(randoRows,'participants');
+  const totalParticBaton  = sum(batonRows,'participants');
+  const totalParticVelo   = sum(veloRows,'participants');
+
+  // ── Mise à jour KPIs globaux ──
+  setText('k-jours',  totalJours + '<span class="kunit"> jours</span>');
+  setText('k-dist',   fmt(totalDist) + '<span class="kunit"> km</span>');
+  setText('k-deniv',  fmt(totalDeniv) + '<span class="kunit"> m</span>');
+  setText('k-benev',  fmt(totalBenev) + '<span class="kunit"> h</span>');
+  setText('k-nordic-s', nordicDates.length + '<span class="kunit"> séances</span>');
+  setText('k-rando-s',  randoDates.length  + '<span class="kunit"> sorties</span>');
+  setText('k-baton-s',  batonDates.length  + '<span class="kunit"> séances</span>');
+  setText('k-velo-s',   veloDates.length   + '<span class="kunit"> sorties</span>');
+  setText('k-cult-s',   cultRows.length > 0 ? cultRows.length + '<span class="kunit"> sorties</span>' : '—');
+
+  // ── RANDONNÉE KPIs ──
+  const rDistT  = sum(randoRows,'distance');
+  const rDenivT = sum(randoRows,'denivele');
+  const rPartT  = sum(randoRows,'participants');
+  const rNb     = randoDates.length;
+  setText('r-sorties',   rNb      + '<span class="kunit"> sorties</span>');
+  setText('r-dist',      fmt(rDistT)  + '<span class="kunit"> km</span>');
+  setText('r-deniv',     fmt(rDenivT) + '<span class="kunit"> m</span>');
+  setText('r-partic',    rPartT   + '<span class="kunit"> pers.</span>');
+  setText('r-moy',       (rNb ? Math.round(rPartT/rNb) : 0) + '<span class="kunit"> moy.</span>');
+  setText('r-dist-moy',  (rNb ? (rDistT/rNb).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
+  setText('r-deniv-moy', (rNb ? Math.round(rDenivT/rNb) : '—') + '<span class="kunit"> m</span>');
+
+  // Difficulté randonnée
+  const diffCount = {};
+  randoRows.forEach(r => { const d = r.difficulte || 'Autre'; diffCount[d] = (diffCount[d]||0)+1; });
+  const tfN = diffCount['Très facile'] || diffCount['Tres facile'] || diffCount['TF'] || 0;
+  const faN = diffCount['Facile'] || diffCount['F'] || 0;
+  const moN = diffCount['Moyen'] || diffCount['M'] || 0;
+  const diN = diffCount['Difficile'] || diffCount['D'] || 0;
+  const pctFacile = rNb ? Math.round((faN/rNb)*100) : 50;
+  setText('r-pct-facile', pctFacile + ' %');
+  document.getElementById('r-diff-badges').innerHTML =
+    `<span class="dbadge tf">Très facile · ${tfN}</span>
+     <span class="dbadge fa">Facile · ${faN}</span>
+     <span class="dbadge mo">Moyen · ${moN}</span>
+     <span class="dbadge di">Difficile · ${diN}</span>`;
+
+  // ── NORDIQUE KPIs ──
+  const nDistT  = sum(nordicRows,'distance');
+  const nDenivT = sum(nordicRows,'denivele');
+  const nPartT  = totalParticNordic;
+  setText('n-seances', nordicDates.length + '<span class="kunit"> séances</span>');
+  setText('n-dist',    fmt(nDistT)  + '<span class="kunit"> km</span>');
+  setText('n-deniv',   fmt(nDenivT) + '<span class="kunit"> m</span>');
+  setText('n-partic',  nPartT + '<span class="kunit"> pers.</span>');
+
+  // Par groupe
+  const groupStats = (rows, dates) => ({
+    seances: dates.length,
+    distMoy: dates.length ? (sum(rows,'distance') / rows.length) : 0,
+    denivMoy: dates.length ? (sum(rows,'denivele') / rows.length) : 0,
+    partMoy: dates.length ? (sum(rows,'participants') / rows.length) : 0,
+  });
+  const gV = groupStats(nVert,  nVertDates);
+  const gB = groupStats(nBleu,  nBleuDates);
+  const gR = groupStats(nRouge, nRougeDates);
+
+  const setGroup = (pfx, g) => {
+    setText(pfx+'-seances', g.seances + '<span style="font-size:11px;font-weight:600;opacity:.6"> séances</span>');
+    setText(pfx+'-dist',    g.distMoy.toFixed(1).replace('.',',') + '<span style="font-size:11px;font-weight:600;opacity:.6"> km</span>');
+    setText(pfx+'-deniv',   Math.round(g.denivMoy) + '<span style="font-size:11px;font-weight:600;opacity:.6"> m</span>');
+    setText(pfx+'-part',    g.partMoy.toFixed(1).replace('.',',') + '<span style="font-size:11px;font-weight:600;opacity:.6"> pers.</span>');
+  };
+  setGroup('nG', gV);
+  setGroup('nB', gB);
+  setGroup('nR', gR);
+  document.getElementById('badge-nG').textContent = gV.seances;
+  document.getElementById('badge-nB').textContent = gB.seances;
+  document.getElementById('badge-nR').textContent = gR.seances;
+  setText('n-moy', (nordicRows.length ? (sum(nordicRows,'participants')/nordicRows.length).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> moy.</span>');
+
+  // ── BÂTONS KPIs ──
+  const bPartT = sum(batonRows,'participants');
+  setText('b-seances', batonDates.length + '<span class="kunit"> séances</span>');
+  setText('b-partic',  bPartT + '<span class="kunit"> pers.</span>');
+  setText('b-moy', (batonDates.length ? (bPartT/batonDates.length).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> moy.</span>');
+
+  // ── VÉLO KPIs ──
+  const vDistT = sum(veloRows,'distance');
+  const vPartT = sum(veloRows,'participants');
+  const vNb    = veloDates.length;
+  setText('v-sorties-k', vNb + '<span class="kunit"> sorties</span>');
+  setText('v-dist',      fmt(vDistT) + '<span class="kunit"> km</span>');
+  setText('v-partic',    vPartT + '<span class="kunit"> pers.</span>');
+  setText('v-dist-moy',  (vNb ? (vDistT/vNb).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
+
+  // ── VIE ASSO KPIs ──
+  setText('vie-actions',  vieRows.length + '<span class="kunit"> actions</span>');
+  setText('vie-benev-h',  fmt(sum(vieRows,'benevolat')) + '<span class="kunit"> h</span>');
+  setText('vie-km-asso',  fmt(sum(vieRows,'deplacement')) + '<span class="kunit"> km</span>');
+  setText('vie-km-total', fmt(sum(filtered,'deplacement')) + '<span class="kunit"> km</span>');
+
+  // ── Données par mois ──
+  const byMonth = (rows, key) => M.map((_,i) =>
+    rows.filter(r => { const d = new Date(r.date); return d.getMonth() === i; })
+        .reduce((s,r) => s + (r[key]||0), 0)
+  );
+  const countByMonth = (dates) => M.map((_,i) =>
+    dates.filter(d => { const dt = new Date(d); return dt.getMonth() === i; }).length
+  );
+
+  const rPartMonth  = byMonth(randoRows,'participants');
+  const nVertMonth  = byMonth(nVert,'participants');
+  const nBleuMonth  = byMonth(nBleu,'participants');
+  const nRougeMonth = byMonth(nRouge,'participants');
+  const bPartMonth  = byMonth(batonRows,'participants');
+  const vPartMonth  = byMonth(veloRows,'participants');
+  const nPartMonth  = M.map((_,i) => (nVertMonth[i]||0)+(nBleuMonth[i]||0)+(nRougeMonth[i]||0));
+
+  const rDistMonth  = byMonth(randoRows,'distance');
+  const rDenivMonth = byMonth(randoRows,'denivele');
+
+  // ── Graphiques ──
+  rebuildCharts({
+    totalParticNordic, totalParticRando, totalParticBaton, totalParticVelo,
+    rDistT, nDistT, vDistT, rDenivT, nDenivT,
+    rPartMonth, nVertMonth, nBleuMonth, nRougeMonth, nPartMonth, bPartMonth, vPartMonth,
+    rDistMonth, rDenivMonth,
+    gV, gB, gR,
+    tfN, faN, moN, diN,
+    batonRows, veloRows, filtered,
+    vieRows,
+  });
+
+  document.getElementById('h-subtitle').textContent =
+    `Tableau de bord · Jan–Juin 2026 · ${items ? filtered.length : '—'} enregistrements · données en temps réel`;
+}
+
+// ══════════════════════════════════════════
+//  CONSTRUCTION DES GRAPHIQUES
+// ══════════════════════════════════════════
+function rebuildCharts(d) {
+  destroyAll();
+
+  // ── GLOBALE ──
+  mk('g-partic','bar',{
+    labels:['Nordique','Randonnée','Bâtons','Vélo'],
+    datasets:[{data:[d.totalParticNordic,d.totalParticRando,d.totalParticBaton,d.totalParticVelo],
+      backgroundColor:[C.g1,C.g2,C.g3,C.g6],borderRadius:5}]
+  },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:OY,y:{grid:{display:false}}}});
+
+  mk('g-donut','doughnut',{
+    labels:['Nordique','Randonnée','Bâtons','Vélo'],
+    datasets:[{data:[d.totalParticNordic,d.totalParticRando,d.totalParticBaton,d.totalParticVelo],
+      backgroundColor:[C.g1,C.g2,C.g3,C.g6],borderWidth:2,borderColor:'#fff'}]
+  },{cutout:'58%',plugins:{legend:{position:'bottom'}}});
+
+  mk('g-dist','bar',{
+    labels:['Nordique','Randonnée','Vélo'],
+    datasets:[
+      {label:'Distance (km)',    data:[d.nDistT,d.rDistT,d.vDistT],   backgroundColor:[a(C.g1,.8),a(C.g2,.8),a(C.g6,.8)], borderRadius:4,yAxisID:'y'},
+      {label:'Dénivelé (/100m)',data:[d.nDenivT/100,d.rDenivT/100,0],backgroundColor:[a(C.g3,.7),a(C.g3,.5),a(C.g3,.3)],borderRadius:4,yAxisID:'y1'},
+    ]
+  },{plugins:{legend:{position:'bottom'}},scales:{
+    x:OX,
+    y:{...OY,position:'left',title:{display:true,text:'km',font:{size:10}}},
+    y1:{...OY,position:'right',grid:{display:false},title:{display:true,text:'dénivelé/100m',font:{size:10}}}
+  }});
+
+  mk('g-partic-month','bar',{labels:M,datasets:[
+    {label:'Nordique',  data:d.nPartMonth,  backgroundColor:C.g1,borderRadius:3},
+    {label:'Randonnée', data:d.rPartMonth,  backgroundColor:C.g2,borderRadius:3},
+    {label:'Bâtons',    data:d.bPartMonth,  backgroundColor:C.g3,borderRadius:3},
+    {label:'Vélo',      data:d.vPartMonth,  backgroundColor:C.g6,borderRadius:3},
+  ]},{plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true,...OX},y:{stacked:true,...OY}}});
+
+  // ── RANDONNÉE ──
+  mk('r-partic-month','bar',{labels:M,datasets:[
+    {label:'Participants',data:d.rPartMonth,backgroundColor:C.g2,borderRadius:5}
+  ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
+
+  mk('r-diff','doughnut',{
+    labels:['Très facile','Facile','Moyen','Difficile'],
+    datasets:[{data:[d.tfN,d.faN,d.moN,d.diN],
+      backgroundColor:[C.g4,C.g1,C.g2,C.g6],borderWidth:2,borderColor:'#fff'}]
+  },{cutout:'55%',plugins:{legend:{display:false}}});
+
+  mk('r-dist-deniv','bar',{labels:M,datasets:[
+    {label:'Distance (km)',    data:d.rDistMonth,                                      backgroundColor:a(C.g2,.75),borderRadius:4,yAxisID:'y'},
+    {label:'Dénivelé (/10m)', data:d.rDenivMonth.map(v=>Math.round(v/10)),            backgroundColor:a(C.g3,.7), borderRadius:4,yAxisID:'y1'},
+  ]},{plugins:{legend:{position:'bottom'}},scales:{
+    x:OX,
+    y:{...OY,position:'left',title:{display:true,text:'km',font:{size:10}}},
+    y1:{...OY,position:'right',grid:{display:false},title:{display:true,text:'dénivelé/10m',font:{size:10}}}
+  }});
+
+  // ── NORDIQUE — ordre Vert / Bleu / Rouge ──
+  mk('n-partic-month','bar',{labels:M,datasets:[
+    {label:'🟢 Vert (Débutants)',  data:d.nVertMonth,  backgroundColor:C.nG,borderRadius:3},
+    {label:'🔵 Bleu (Interméd.)', data:d.nBleuMonth,  backgroundColor:C.nB,borderRadius:3},
+    {label:'🔴 Rouge (Confirmés)',data:d.nRougeMonth, backgroundColor:C.nR,borderRadius:3},
+  ]},{plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true,...OX},y:{stacked:true,...OY}}});
+
+  mk('n-donut','doughnut',{
+    labels:['Vert · Débutants','Bleu · Interméd.','Rouge · Confirmés'],
+    datasets:[{data:[d.gV.seances,d.gB.seances,d.gR.seances],
+      backgroundColor:[C.nG,C.nB,C.nR],borderWidth:2,borderColor:'#fff'}]
+  },{cutout:'58%',plugins:{legend:{display:false}}});
+
+  // ── BÂTONS ──
+  mk('b-partic-month','bar',{labels:M,datasets:[
+    {label:'Participants',data:d.bPartMonth,backgroundColor:C.g3,borderRadius:5}
+  ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
+
+  // Lieux bâtons
+  const lieuxCount = {};
+  d.batonRows.forEach(r => { if(r.lieu) lieuxCount[r.lieu]=(lieuxCount[r.lieu]||0)+1; });
+  const lieuxSorted = Object.entries(lieuxCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  mk('b-lieux','bar',{
+    labels: lieuxSorted.length ? lieuxSorted.map(l=>l[0]) : ['Hadol','Xertigny','Uriménil','Autres'],
+    datasets:[{data: lieuxSorted.length ? lieuxSorted.map(l=>l[1]) : [9,6,5,4],
+      backgroundColor:[C.g1,C.g2,C.g3,C.g4,C.g5],borderRadius:5}]
+  },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,ticks:{stepSize:2}},y:{grid:{display:false}}}});
+
+  // ── VÉLO ──
+  mk('v-partic-month','bar',{labels:M,datasets:[
+    {label:'Participants',data:d.vPartMonth,backgroundColor:C.g6,borderRadius:5}
+  ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
+
+  // Participants par sortie vélo
+  const veloDates2 = [...new Set(d.veloRows.map(r=>r.date.slice(0,10)))].sort();
+  const veloParticBySortie = veloDates2.map(dt => ({
+    lbl: new Date(dt).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}),
+    val: d.veloRows.filter(r=>r.date.slice(0,10)===dt).reduce((s,r)=>s+r.participants,0)
+  }));
+  mk('v-sorties','bar',{
+    labels: veloParticBySortie.length ? veloParticBySortie.map(x=>x.lbl) : ['Sortie 1','Sortie 2','Sortie 3','Sortie 4','Sortie 5'],
+    datasets:[{data: veloParticBySortie.length ? veloParticBySortie.map(x=>x.val) : [6,8,10,14,9],
+      backgroundColor:[C.g1,C.g2,C.g3,C.g6,C.g4],borderRadius:5}]
+  },{plugins:{legend:{display:false}},scales:{x:OX,y:{...OY,ticks:{stepSize:5}}}});
+
+  // ── VIE ASSO ──
+  const typeLabels=['Nordique','Randonnée','Vie asso','Bâtons','Vélo','Autres'];
+  const vieBenevData = [
+    d.filtered.filter(r=>/nordique/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(r=>/animation.rand/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
+    d.vieRows.reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(r=>/b.ton/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(r=>/v.lo/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(r=>!/nordique|animation.rand|vie|asso|b.ton|v.lo/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
+  ];
+  const vieKmData = [
+    d.filtered.filter(r=>/nordique/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(r=>/animation.rand/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
+    d.vieRows.reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(r=>/b.ton/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(r=>/v.lo/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(r=>!/nordique|animation.rand|vie|asso|b.ton|v.lo/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
+  ];
+
+  mk('vie-benev','bar',{labels:typeLabels,datasets:[
+    {data:vieBenevData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.g5],borderRadius:5}
+  ]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,title:{display:true,text:'heures',font:{size:10}}},y:{grid:{display:false}}}});
+
+  mk('vie-km','bar',{labels:typeLabels,datasets:[
+    {data:vieKmData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.g5],borderRadius:5}
+  ]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,title:{display:true,text:'km',font:{size:10}}},y:{grid:{display:false}}}});
+}
+
+// ══════════════════════════════════════════
+//  PAS DE DONNÉES STATIQUES — écran d'attente
+// ══════════════════════════════════════════
+function buildStaticCharts() {
+  // On n'affiche rien — l'overlay de chargement est déjà visible
+  // Les graphiques seront construits uniquement avec les vraies données SharePoint
+}
+
+// ══════════════════════════════════════════
+//  UTILITAIRES
+// ══════════════════════════════════════════
+function mk(id, type, data, options={}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  allCharts[id] = new Chart(el, { type, data, options: { responsive:true, ...options } });
+}
+function destroyAll() {
+  Object.values(allCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+  allCharts = {};
+}
+function setText(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+function fmt(n) {
+  return Math.round(n).toLocaleString('fr-FR');
+}
+function showLoading(msg, sub) {
+  const o = document.getElementById('loading-overlay');
+  o.style.display = 'flex';
+  document.getElementById('loading-msg').textContent = msg || 'Chargement…';
+  document.getElementById('loading-sub').textContent = sub || '';
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+function setAuthConnected(count) {
+  const bar = document.getElementById('auth-bar');
+  bar.className = 'connected';
+  document.getElementById('auth-status-text').textContent =
+    `Connecté — ${count} enregistrements chargés depuis SharePoint`;
+  document.getElementById('btn-connect').style.display = 'none';
+  document.getElementById('btn-refresh').style.display = 'inline-block';
+  const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('last-update').textContent = `Mis à jour à ${now}`;
+}function setAuthError(msg) {
+  const bar = document.getElementById('auth-bar');
+  bar.className = 'error';
+  // Message d'accès refusé propre
+  const isAuthError = /interaction|login|account|AADS/i.test(msg);
+  document.getElementById('auth-status-text').textContent = isAuthError
+    ? 'Accès réservé aux membres Copains Baladeurs'
+    : 'Erreur : ' + msg;
+  document.getElementById('btn-connect').style.display = 'inline-block';
+  document.getElementById('btn-connect').disabled = false;
+  // Cacher l'overlay et afficher le dashboard vide
+  hideLoading();
+}
+
+function nav(btn, id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('on'));
+  document.getElementById('pg-' + id).classList.add('on');
+  btn.classList.add('on');
+}
+
+// ══════════════════════════════════════════
+//  DÉMARRAGE
+// ══════════════════════════════════════════
+
+// Attendre que MSAL soit chargé (max 5s)
+(function waitForMsal(attempts) {
+  const lib = window.msalBrowser || window.msal;
+  if (lib && lib.PublicClientApplication) {
+    initMsal();
+  } else if (attempts > 0) {
+    setTimeout(() => waitForMsal(attempts - 1), 300);
+  } else {
+    document.getElementById('loading-msg').textContent = 'Connexion impossible';
+    document.getElementById('loading-sub').textContent = 'Vérifiez votre connexion internet';
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = false;
+    btn.textContent = '🔐 Se connecter à SharePoint';
+    hideLoading();
+  }
+})(16); // 16 × 300ms = ~5 secondes max
+</script>
+</body>
+</html>
