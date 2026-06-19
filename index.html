@@ -526,38 +526,41 @@ async function initMsal() {
     btn.disabled = false;
     btn.textContent = '🔐 Se connecter à SharePoint';
 
-    // ── Gestion du retour après redirection Microsoft ──
+    // Gestion retour redirection Microsoft
+    let redirectResp = null;
     try {
-      const resp = await msalApp.handleRedirectPromise();
-      if (resp && resp.accessToken) {
-        // Retour de login réussi → charger les données directement
-        await loadData(resp.accessToken);
-        return;
-      }
-    } catch(e2) { /* pas de redirect en cours */ }
+      redirectResp = await msalApp.handleRedirectPromise();
+    } catch(e) { /* pas de redirect */ }
 
-    // ── Tentative silencieuse si compte déjà connu ──
+    if (redirectResp && redirectResp.accessToken) {
+      await loadData(redirectResp.accessToken);
+      return;
+    }
+
+    // Tentative silencieuse avec timeout strict 3s
     const accounts = msalApp.getAllAccounts();
     if (accounts.length > 0) {
       try {
-        showLoading('Connexion automatique…', 'Récupération de votre session');
-        // Timeout 5s pour éviter de rester bloqué
-        const silentPromise = msalApp.acquireTokenSilent({
-          scopes: GRAPH_SCOPE,
-          account: accounts[0]
-        });
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 5000)
-        );
-        const r = await Promise.race([silentPromise, timeoutPromise]);
+        const r = await Promise.race([
+          msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))
+        ]);
         await loadData(r.accessToken);
         return;
-      } catch(e3) {
-        hideLoading();
-      }
-    } else {
-      hideLoading();
+      } catch(e) { /* timeout ou échec → bouton */ }
     }
+
+    // Afficher le bouton
+    hideLoading();
+
+  } catch(e) {
+    console.error('MSAL:', e);
+    hideLoading();
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = false;
+    btn.textContent = '🔐 Se connecter à SharePoint';
+  }
+}
 
   } catch(e) {
     console.error('MSAL init error:', e);
