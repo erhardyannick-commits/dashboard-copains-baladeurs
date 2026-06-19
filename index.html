@@ -512,9 +512,17 @@ const M=['Jan','Fév','Mar','Avr','Mai','Juin'];
 //  INIT MSAL
 // ══════════════════════════════════════════
 async function initMsal() {
+  // Timeout global 4s sur toute l'init
+  const initTimeout = setTimeout(() => {
+    hideLoading();
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = false;
+    btn.textContent = '🔐 Se connecter à SharePoint';
+  }, 4000);
+
   try {
     const lib = checkMsalLoaded();
-    if (!lib) return;
+    if (!lib) { clearTimeout(initTimeout); hideLoading(); return; }
 
     msalApp = new lib.PublicClientApplication(MSAL_CONFIG);
     if (typeof msalApp.initialize === 'function') {
@@ -522,43 +530,32 @@ async function initMsal() {
     }
 
     msalReady = true;
-    const btn = document.getElementById('btn-connect');
-    btn.disabled = false;
-    btn.textContent = '🔐 Se connecter à SharePoint';
+    document.getElementById('btn-connect').disabled = false;
+    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
 
-    // Gestion retour redirection Microsoft
-    let redirectResp = null;
-    try {
-      redirectResp = await msalApp.handleRedirectPromise();
-    } catch(e) { /* pas de redirect */ }
-
-    if (redirectResp && redirectResp.accessToken) {
-      await loadData(redirectResp.accessToken);
-      return;
-    }
-
-    // Tentative silencieuse avec timeout strict 3s
+    // Tentative silencieuse uniquement si compte déjà en cache MSAL
     const accounts = msalApp.getAllAccounts();
     if (accounts.length > 0) {
       try {
         const r = await Promise.race([
           msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))
+          new Promise((_, rej) => setTimeout(() => rej('timeout'), 3000))
         ]);
+        clearTimeout(initTimeout);
         await loadData(r.accessToken);
         return;
-      } catch(e) { /* timeout ou échec → bouton */ }
+      } catch(e) { /* timeout → bouton */ }
     }
 
-    // Afficher le bouton
+    clearTimeout(initTimeout);
     hideLoading();
 
   } catch(e) {
+    clearTimeout(initTimeout);
     console.error('MSAL:', e);
     hideLoading();
-    const btn = document.getElementById('btn-connect');
-    btn.disabled = false;
-    btn.textContent = '🔐 Se connecter à SharePoint';
+    document.getElementById('btn-connect').disabled = false;
+    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
   }
 }
 
