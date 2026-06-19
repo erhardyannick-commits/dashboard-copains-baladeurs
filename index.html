@@ -5,15 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Copains Baladeurs — Tableau de bord 2026</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<!-- MSAL pour authentification Azure AD — double CDN avec fallback -->
-<script>
-  // On tente d'abord jsdelivr, puis unpkg en fallback
-  window._msalLoaded = false;
-</script>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"
-  onerror="document.getElementById('msal-fallback').src='https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js'">
-</script>
-<script id="msal-fallback"></script>
+<!-- MSAL v2 — stable, pas besoin d'initialize() -->
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap');
 :root {
@@ -477,15 +470,11 @@ let allCharts = {};
 
 // Vérification que MSAL est bien chargé
 function checkMsalLoaded() {
-  // MSAL v3 expose msalBrowser, v2 expose msal
-  const lib = window.msalBrowser || window.msal;
-  if (!lib || !lib.PublicClientApplication) {
-    console.error('MSAL non disponible, lib =', lib);
-    document.getElementById('auth-status-text').textContent =
-      'Bibliothèque MSAL introuvable — vérifiez votre connexion internet';
+  if (!window.msal || !window.msal.PublicClientApplication) {
+    console.error('MSAL v2 non disponible');
     return null;
   }
-  return lib;
+  return window.msal;
 }
 
 // ══════════════════════════════════════════
@@ -511,29 +500,34 @@ const M=['Jan','Fév','Mar','Avr','Mai','Juin'];
 // ══════════════════════════════════════════
 //  INIT MSAL
 // ══════════════════════════════════════════
-async function initMsal() {
-  // Timeout global absolu 4s
-  const killSwitch = setTimeout(() => {
-    hideLoading();
-    document.getElementById('btn-connect').disabled = false;
-    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
-  }, 4000);
-
+function initMsal() {
   try {
     const lib = checkMsalLoaded();
-    if (!lib) { clearTimeout(killSwitch); hideLoading(); return; }
+    if (!lib) {
+      hideLoading();
+      document.getElementById('btn-connect').disabled = false;
+      document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
+      return;
+    }
 
+    // MSAL v2 — pas d'initialize(), instanciation synchrone
     msalApp = new lib.PublicClientApplication(MSAL_CONFIG);
-    // NE PAS appeler initialize() — bloque sur GitHub Pages
     msalReady = true;
 
-    clearTimeout(killSwitch);
+    // Afficher le bouton immédiatement
     hideLoading();
     document.getElementById('btn-connect').disabled = false;
     document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
 
+    // Tentative silencieuse si compte connu
+    const accounts = msalApp.getAllAccounts();
+    if (accounts.length > 0) {
+      msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] })
+        .then(r => { if (r) loadData(r.accessToken); })
+        .catch(() => { /* pas de session → bouton déjà visible */ });
+    }
+
   } catch(e) {
-    clearTimeout(killSwitch);
     console.error('MSAL:', e);
     hideLoading();
     document.getElementById('btn-connect').disabled = false;
@@ -1138,18 +1132,16 @@ function nav(btn, id) {
 
 // Attendre que MSAL soit chargé (max 5s)
 (function waitForMsal(attempts) {
-  const lib = window.msalBrowser || window.msal;
-  if (lib && lib.PublicClientApplication) {
+  if (window.msal && window.msal.PublicClientApplication) {
     initMsal();
   } else if (attempts > 0) {
     setTimeout(() => waitForMsal(attempts - 1), 300);
   } else {
-    document.getElementById('loading-msg').textContent = 'Connexion impossible';
-    document.getElementById('loading-sub').textContent = 'Vérifiez votre connexion internet';
-    const btn = document.getElementById('btn-connect');
-    btn.disabled = false;
-    btn.textContent = '🔐 Se connecter à SharePoint';
     hideLoading();
+    document.getElementById('auth-status-text').textContent =
+      'Bibliothèque MSAL introuvable — vérifiez votre connexion internet';
+    document.getElementById('btn-connect').disabled = false;
+    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
   }
 })(16); // 16 × 300ms = ~5 secondes max
 </script>
