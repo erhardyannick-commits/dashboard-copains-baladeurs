@@ -512,46 +512,28 @@ const M=['Jan','Fév','Mar','Avr','Mai','Juin'];
 //  INIT MSAL
 // ══════════════════════════════════════════
 async function initMsal() {
-  // Timeout global 4s sur toute l'init
-  const initTimeout = setTimeout(() => {
+  // Timeout global absolu 4s
+  const killSwitch = setTimeout(() => {
     hideLoading();
-    const btn = document.getElementById('btn-connect');
-    btn.disabled = false;
-    btn.textContent = '🔐 Se connecter à SharePoint';
+    document.getElementById('btn-connect').disabled = false;
+    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
   }, 4000);
 
   try {
     const lib = checkMsalLoaded();
-    if (!lib) { clearTimeout(initTimeout); hideLoading(); return; }
+    if (!lib) { clearTimeout(killSwitch); hideLoading(); return; }
 
     msalApp = new lib.PublicClientApplication(MSAL_CONFIG);
-    if (typeof msalApp.initialize === 'function') {
-      await msalApp.initialize();
-    }
-
+    // NE PAS appeler initialize() — bloque sur GitHub Pages
     msalReady = true;
+
+    clearTimeout(killSwitch);
+    hideLoading();
     document.getElementById('btn-connect').disabled = false;
     document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
 
-    // Tentative silencieuse uniquement si compte déjà en cache MSAL
-    const accounts = msalApp.getAllAccounts();
-    if (accounts.length > 0) {
-      try {
-        const r = await Promise.race([
-          msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] }),
-          new Promise((_, rej) => setTimeout(() => rej('timeout'), 3000))
-        ]);
-        clearTimeout(initTimeout);
-        await loadData(r.accessToken);
-        return;
-      } catch(e) { /* timeout → bouton */ }
-    }
-
-    clearTimeout(initTimeout);
-    hideLoading();
-
   } catch(e) {
-    clearTimeout(initTimeout);
+    clearTimeout(killSwitch);
     console.error('MSAL:', e);
     hideLoading();
     document.getElementById('btn-connect').disabled = false;
@@ -602,7 +584,7 @@ async function connectAndLoad() {
   showLoading('Connexion Microsoft…', 'Fenêtre de connexion en cours d\'ouverture');
   try {
     const token = await getToken();
-    await loadData(token);
+    if (token) await loadData(token);
   } catch(e) {
     setAuthError(e.message);
   } finally {
