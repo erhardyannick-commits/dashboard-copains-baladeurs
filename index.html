@@ -517,7 +517,6 @@ async function initMsal() {
     if (!lib) return;
 
     msalApp = new lib.PublicClientApplication(MSAL_CONFIG);
-
     if (typeof msalApp.initialize === 'function') {
       await msalApp.initialize();
     }
@@ -527,61 +526,43 @@ async function initMsal() {
     btn.disabled = false;
     btn.textContent = '🔐 Se connecter à SharePoint';
 
-    // Gestion du retour de redirection
+    // ── Gestion du retour après redirection Microsoft ──
     try {
-      const handleRedirect = msalApp.handleRedirectPromise
-        ? msalApp.handleRedirectPromise.bind(msalApp)
-        : null;
-      if (handleRedirect) {
-        const resp = await handleRedirect();
-        if (resp && resp.accessToken) {
-          await loadData(resp.accessToken);
-          return;
-        }
+      const resp = await msalApp.handleRedirectPromise();
+      if (resp && resp.accessToken) {
+        // Retour de login réussi → charger les données directement
+        await loadData(resp.accessToken);
+        return;
       }
     } catch(e2) { /* pas de redirect en cours */ }
 
-    // ── CONNEXION SILENCIEUSE AUTOMATIQUE ──
-    // Tente d'abord ssoSilent (utilise la session Microsoft du navigateur)
-    // puis acquireTokenSilent si un compte est déjà connu
-    let silentOk = false;
-
-    // 1. Essai ssoSilent (fonctionne si l'utilisateur est connecté à M365 dans Chrome)
-    try {
-      showLoading('Connexion automatique…', 'Vérification de votre session Microsoft');
-      const loginHint = sessionStorage.getItem('cb_login_hint') || '';
-      const r = await msalApp.ssoSilent({
-        scopes: GRAPH_SCOPE,
-        loginHint: loginHint
-      });
-      if (r && r.accessToken) {
-        sessionStorage.setItem('cb_login_hint', r.account?.username || '');
+    // ── Tentative silencieuse si compte déjà connu ──
+    const accounts = msalApp.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        showLoading('Connexion automatique…', 'Récupération de votre session');
+        const r = await msalApp.acquireTokenSilent({
+          scopes: GRAPH_SCOPE,
+          account: accounts[0]
+        });
         await loadData(r.accessToken);
-        silentOk = true;
+        return;
+      } catch(e3) {
+        hideLoading();
       }
-    } catch(e1) {
-      // ssoSilent échoué → essai acquireTokenSilent
-    }
-
-    if (!silentOk) {
-      // 2. Essai acquireTokenSilent si compte connu en mémoire MSAL
-      const accounts = msalApp.getAllAccounts();
-      if (accounts.length > 0) {
-        try {
-          const r = await msalApp.acquireTokenSilent({
-            scopes: GRAPH_SCOPE,
-            account: accounts[0]
-          });
-          sessionStorage.setItem('cb_login_hint', r.account?.username || '');
-          await loadData(r.accessToken);
-          silentOk = true;
-        } catch(e2) { /* échec → bouton manuel */ }
-      }
-    }
-
-    if (!silentOk) {
+    } else {
       hideLoading();
     }
+
+  } catch(e) {
+    console.error('MSAL init error:', e);
+    document.getElementById('auth-status-text').textContent = 'Erreur MSAL : ' + e.message;
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = false;
+    btn.textContent = '🔐 Se connecter à SharePoint';
+    hideLoading();
+  }
+}
 
   } catch(e) {
     console.error('MSAL init error:', e);
@@ -600,15 +581,11 @@ async function getToken() {
     try {
       const r = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] });
       return r.accessToken;
-    } catch(e) { /* silent fail → popup */ }
+    } catch(e) { /* silent fail → redirection */ }
   }
-  try {
-    const r = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPE });
-    sessionStorage.setItem('cb_login_hint', r.account?.username || '');
-    return r.accessToken;
-  } catch(e) {
-    throw new Error('Authentification annulée ou échouée : ' + e.message);
-  }
+  // Redirection vers Microsoft (pas de popup — fonctionne partout)
+  await msalApp.loginRedirect({ scopes: GRAPH_SCOPE });
+  return null; // la page va se recharger après login
 }
 
 async function connectAndLoad() {
