@@ -518,26 +518,6 @@ function initMsal() {
   }
 }
 
-  } catch(e) {
-    console.error('MSAL init error:', e);
-    document.getElementById('auth-status-text').textContent = 'Erreur MSAL : ' + e.message;
-    const btn = document.getElementById('btn-connect');
-    btn.disabled = false;
-    btn.textContent = '🔐 Se connecter à SharePoint';
-    hideLoading();
-  }
-}
-
-  } catch(e) {
-    console.error('MSAL init error:', e);
-    document.getElementById('auth-status-text').textContent =
-      'Erreur MSAL : ' + e.message;
-    const btn = document.getElementById('btn-connect');
-    btn.disabled = false;
-    btn.textContent = '🔐 Se connecter à SharePoint';
-  }
-}
-
 async function getToken() {
   if (!msalApp) throw new Error('MSAL non chargé');
   // Essai silencieux d'abord
