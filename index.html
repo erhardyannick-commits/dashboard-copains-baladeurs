@@ -174,22 +174,22 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
 </head>
 <body>
 
-<!-- Overlay chargement -->
-<div class="loading-overlay" id="loading-overlay">
+<!-- Overlay chargement — caché par défaut, affiché uniquement pendant le chargement des données -->
+<div class="loading-overlay" id="loading-overlay" style="display:none">
   <div class="spinner"></div>
-  <div class="loading-msg" id="loading-msg">Connexion en cours…</div>
-  <div class="loading-sub" id="loading-sub">Vérification de votre session Microsoft</div>
+  <div class="loading-msg" id="loading-msg">Chargement des données…</div>
+  <div class="loading-sub" id="loading-sub">Lecture de la Microsoft List</div>
 </div>
 
 <!-- Barre de connexion -->
 <div id="auth-bar">
   <div id="auth-status">
     <div class="dot"></div>
-    <span id="auth-status-text">Connexion à SharePoint en cours…</span>
+    <span id="auth-status-text">Non connecté</span>
   </div>
   <span id="last-update"></span>
-  <button id="btn-refresh" onclick="loadData()">🔄 Actualiser</button>
-  <button id="btn-connect" onclick="connectAndLoad()" disabled>🔐 Connexion en cours…</button>
+  <button id="btn-refresh" onclick="loadData()" style="display:none">🔄 Actualiser</button>
+  <button id="btn-connect" onclick="connectAndLoad()">🔐 Se connecter à SharePoint</button>
 </div>
 
 <header>
@@ -502,36 +502,19 @@ const M=['Jan','Fév','Mar','Avr','Mai','Juin'];
 // ══════════════════════════════════════════
 function initMsal() {
   try {
-    const lib = checkMsalLoaded();
-    if (!lib) {
-      hideLoading();
-      document.getElementById('btn-connect').disabled = false;
-      document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
-      return;
-    }
-
-    // MSAL v2 — pas d'initialize(), instanciation synchrone
-    msalApp = new lib.PublicClientApplication(MSAL_CONFIG);
+    if (!window.msal || !window.msal.PublicClientApplication) return;
+    msalApp = new window.msal.PublicClientApplication(MSAL_CONFIG);
     msalReady = true;
 
-    // Afficher le bouton immédiatement
-    hideLoading();
-    document.getElementById('btn-connect').disabled = false;
-    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
-
-    // Tentative silencieuse si compte connu
+    // Tentative silencieuse si compte déjà connu
     const accounts = msalApp.getAllAccounts();
     if (accounts.length > 0) {
       msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] })
-        .then(r => { if (r) loadData(r.accessToken); })
-        .catch(() => { /* pas de session → bouton déjà visible */ });
+        .then(r => { if (r && r.accessToken) loadData(r.accessToken); })
+        .catch(() => { /* pas de session → bouton visible */ });
     }
-
   } catch(e) {
     console.error('MSAL:', e);
-    hideLoading();
-    document.getElementById('btn-connect').disabled = false;
-    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
   }
 }
 
@@ -556,17 +539,18 @@ function initMsal() {
 }
 
 async function getToken() {
-  if (!msalApp) throw new Error('MSAL non initialisé — rechargez la page');
+  if (!msalApp) throw new Error('MSAL non chargé');
+  // Essai silencieux d'abord
   const accounts = msalApp.getAllAccounts();
   if (accounts.length > 0) {
     try {
       const r = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] });
       return r.accessToken;
-    } catch(e) { /* silent fail → redirection */ }
+    } catch(e) { /* → popup */ }
   }
-  // Redirection vers Microsoft (pas de popup — fonctionne partout)
-  await msalApp.loginRedirect({ scopes: GRAPH_SCOPE });
-  return null; // la page va se recharger après login
+  // Popup Microsoft
+  const r = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPE });
+  return r.accessToken;
 }
 
 async function connectAndLoad() {
@@ -1131,19 +1115,14 @@ function nav(btn, id) {
 // ══════════════════════════════════════════
 
 // Attendre que MSAL soit chargé (max 5s)
-(function waitForMsal(attempts) {
+// Attendre que MSAL v2 soit chargé puis init
+(function waitForMsal(n) {
   if (window.msal && window.msal.PublicClientApplication) {
     initMsal();
-  } else if (attempts > 0) {
-    setTimeout(() => waitForMsal(attempts - 1), 300);
-  } else {
-    hideLoading();
-    document.getElementById('auth-status-text').textContent =
-      'Bibliothèque MSAL introuvable — vérifiez votre connexion internet';
-    document.getElementById('btn-connect').disabled = false;
-    document.getElementById('btn-connect').textContent = '🔐 Se connecter à SharePoint';
+  } else if (n > 0) {
+    setTimeout(() => waitForMsal(n - 1), 300);
   }
-})(16); // 16 × 300ms = ~5 secondes max
+})(20); // 16 × 300ms = ~5 secondes max
 </script>
 </body>
 </html>
