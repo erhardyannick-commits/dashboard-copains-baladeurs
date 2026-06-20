@@ -661,9 +661,9 @@ function processAndRender(items, rawItems) {
       denivele     = gn('field_34');
       participants = gn('field_35');
     } else if (typeNorm.includes('visite') || typeNorm.includes('culturel') || typeNorm.includes('randovisite')) {
-      distance     = gn('field_23');
-      denivele     = gn('field_25');
-      participants = gn('field_27');
+      distance     = gn('field_24');
+      denivele     = gn('field_26');
+      participants = gn('field_28');
     }
 
     return {
@@ -834,10 +834,6 @@ function processAndRender(items, rawItems) {
   setText('c-partic',  cultPartT + '<span class="kunit"> pers.</span>');
 
   // ── Rendu détail sorties culturelles ──
-  // DEBUG temporaire
-  const cultDebug = rawItems.filter(i => i.fields && /sortie culturelle|culturel/i.test((i.fields.field_5||'').toString()));
-  if (cultDebug.length > 0) console.log('🏛 Sortie culturelle fields:', JSON.stringify(cultDebug[0].fields, null, 2));
-
   const cultList = document.getElementById('cult-sorties-list');
   if (cultList) {
     if (cultRows.length === 0) {
@@ -853,24 +849,23 @@ function processAndRender(items, rawItems) {
         const f = rawItems.find(i => i.fields && i.fields.field_3 === r.date) || {};
         const ff = f.fields || {};
         const dateStr = r.date ? new Date(r.date).toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'}) : '—';
-        // Mapping confirmé depuis le CSV :
-        // field_22 = descriptif général
-        // field_23 = distance rando
-        // field_24 = durée rando
-        // field_25 = dénivelé rando
-        // field_26 = lieu rando
-        // field_27 = participants rando
-        // field_28 = lieu visite
-        // field_29 = descriptif visite
-        // field_30 = participants visite
-        const lieuVisite   = (ff.field_28 || '—').toString();
-        const descVisite   = (ff.field_29 || '').toString();
-        const partVisite   = (ff.field_30 || '—').toString();
-        const lieuRando    = (ff.field_26 || '—').toString();
-        const distRando    = ff.field_23 ? parseFloat(ff.field_23) : 0;
-        const denivRando   = ff.field_25 ? parseFloat(ff.field_25) : 0;
-        const partRando    = (ff.field_27 || '—').toString();
-        const descriptif   = (ff.field_22 || '').toString();
+        // Mapping confirmé par debug console :
+        // field_23 = descriptif général
+        // field_24 = distance rando
+        // field_26 = dénivelé rando
+        // field_27 = lieu rando
+        // field_28 = participants rando
+        // field_29 = lieu visite
+        // field_30 = descriptif visite
+        // field_31 = participants visite
+        const lieuVisite   = (ff.field_29 || '—').toString();
+        const descVisite   = (ff.field_30 || '').toString();
+        const partVisite   = (ff.field_31 || '—').toString();
+        const lieuRando    = (ff.field_27 || '—').toString();
+        const distRando    = ff.field_24 ? parseFloat(ff.field_24) : 0;
+        const denivRando   = ff.field_26 ? parseFloat(ff.field_26) : 0;
+        const partRando    = (ff.field_28 || '—').toString();
+        const descriptif   = (ff.field_23 || '').toString();
         return `
         <div class="card" style="margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
