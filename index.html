@@ -379,7 +379,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
     <div class="kpi"><span class="kico">📅</span><div class="kval" id="v-sorties-k">…</div><div class="klbl">Sorties organisées</div></div>
     <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="v-dist">…</div><div class="klbl">Distance totale</div></div>
     <div class="kpi b3"><span class="kico">👥</span><div class="kval" id="v-partic">…</div><div class="klbl">Participants cumulés</div></div>
-    <div class="kpi b6"><span class="kico">🗺</span><div class="kval" id="v-dist-moy">…</div><div class="klbl">Distance moy. / sortie</div></div>
+    <div class="kpi b6"><span class="kico">👤</span><div class="kval" id="v-moy">…</div><div class="klbl">Participants moy. / sortie</div></div>
   </div>
 
   <div class="slbl">Analyse</div>
@@ -398,7 +398,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
     <div class="kpi"><span class="kico">📅</span><div class="kval" id="c-sorties">…</div><div class="klbl">Sorties organisées</div></div>
     <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="c-dist">…</div><div class="klbl">Distance rando cumulée</div></div>
     <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="c-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
-    <div class="kpi b6"><span class="kico">👥</span><div class="kval" id="c-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b6"><span class="kico">👤</span><div class="kval" id="c-moy">…</div><div class="klbl">Participants moy. / sortie</div></div>
   </div>
 
   <div class="slbl">Détail des sorties</div>
@@ -871,17 +871,27 @@ function processAndRender(items, rawItems) {
   const nDistT  = sum(nordicRows,'distance');
   const nDenivT = sum(nordicRows,'denivele');
   const nPartT  = totalParticNordic;
+  // Moyenne participants par séance = total participants / nombre de séances uniques
+  const nMoyParSeance = nordicDates.length
+    ? (nordicDates.reduce((s, d) => {
+        const dayRows = nordicRows.filter(r => r.date.slice(0,10) === d);
+        return s + sum(dayRows,'participants');
+      }, 0) / nordicDates.length)
+    : 0;
   setText('n-seances', nordicDates.length + '<span class="kunit"> séances</span>');
   setText('n-dist',    fmt(nDistT)  + '<span class="kunit"> km</span>');
   setText('n-deniv',   fmt(nDenivT) + '<span class="kunit"> m</span>');
   setText('n-partic',  nPartT + '<span class="kunit"> pers.</span>');
 
-  // Par groupe
+  // Par groupe — moyenne participants par séance (pas par ligne)
   const groupStats = (rows, dates) => ({
     seances: dates.length,
-    distMoy: dates.length ? (sum(rows,'distance') / rows.length) : 0,
-    denivMoy: dates.length ? (sum(rows,'denivele') / rows.length) : 0,
-    partMoy: dates.length ? (sum(rows,'participants') / rows.length) : 0,
+    distMoy: rows.length ? (sum(rows,'distance') / rows.length) : 0,
+    denivMoy: rows.length ? (sum(rows,'denivele') / rows.length) : 0,
+    partMoy: dates.length ? (dates.reduce((s, d) => {
+      const dr = rows.filter(r => r.date.slice(0,10) === d);
+      return s + sum(dr,'participants');
+    }, 0) / dates.length) : 0,
   });
   const gV = groupStats(nVert,  nVertDates);
   const gB = groupStats(nBleu,  nBleuDates);
@@ -891,7 +901,7 @@ function processAndRender(items, rawItems) {
     setText(pfx+'-seances', g.seances + '<span style="font-size:11px;font-weight:600;opacity:.6"> séances</span>');
     setText(pfx+'-dist',    g.distMoy.toFixed(1).replace('.',',') + '<span style="font-size:11px;font-weight:600;opacity:.6"> km</span>');
     setText(pfx+'-deniv',   Math.round(g.denivMoy) + '<span style="font-size:11px;font-weight:600;opacity:.6"> m</span>');
-    setText(pfx+'-part',    g.partMoy.toFixed(1).replace('.',',') + '<span style="font-size:11px;font-weight:600;opacity:.6"> pers.</span>');
+    setText(pfx+'-part',    g.partMoy.toFixed(1).replace('.',',') + '<span style="font-size:11px;font-weight:600;opacity:.6"> pers./séance</span>');
   };
   setGroup('nG', gV);
   setGroup('nB', gB);
@@ -899,31 +909,38 @@ function processAndRender(items, rawItems) {
   document.getElementById('badge-nG').textContent = gV.seances;
   document.getElementById('badge-nB').textContent = gB.seances;
   document.getElementById('badge-nR').textContent = gR.seances;
-  setText('n-moy', (nordicRows.length ? (sum(nordicRows,'participants')/nordicRows.length).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> moy.</span>');
+  setText('n-moy', nMoyParSeance.toFixed(1).replace('.',',') + '<span class="kunit"> pers./séance</span>');
 
   // ── BÂTONS KPIs ──
   const bPartT = sum(batonRows,'participants');
   setText('b-seances', batonDates.length + '<span class="kunit"> séances</span>');
   setText('b-partic',  bPartT + '<span class="kunit"> pers.</span>');
-  setText('b-moy', (batonDates.length ? (bPartT/batonDates.length).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> moy.</span>');
+  setText('b-moy', (batonDates.length ? (bPartT/batonDates.length).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> pers./séance</span>');
 
   // ── VÉLO KPIs ──
   const vDistT = sum(veloRows,'distance');
   const vPartT = sum(veloRows,'participants');
   const vNb    = veloDates.length;
+  const vMoy   = vNb ? (vPartT/vNb).toFixed(1).replace('.',',') : '—';
   setText('v-sorties-k', vNb + '<span class="kunit"> sorties</span>');
   setText('v-dist',      fmt(vDistT) + '<span class="kunit"> km</span>');
   setText('v-partic',    vPartT + '<span class="kunit"> pers.</span>');
   setText('v-dist-moy',  (vNb ? (vDistT/vNb).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
+  // Ajouter moyenne participants si le KPI existe
+  const vMoyEl = document.getElementById('v-moy');
+  if (vMoyEl) setText('v-moy', vMoy + '<span class="kunit"> pers./sortie</span>');
 
   // ── SORTIES CULTURELLES KPIs ──
   const cultDistT  = sum(cultRows,'distance');
   const cultDenivT = sum(cultRows,'denivele');
   const cultPartT  = sum(cultRows,'participants');
+  const cultMoy    = cultRows.length ? (cultPartT/cultRows.length).toFixed(1).replace('.',',') : '—';
   setText('c-sorties', cultRows.length + '<span class="kunit"> sorties</span>');
   setText('c-dist',    fmt(cultDistT)  + '<span class="kunit"> km</span>');
   setText('c-deniv',   fmt(cultDenivT) + '<span class="kunit"> m</span>');
   setText('c-partic',  cultPartT + '<span class="kunit"> pers.</span>');
+  const cMoyEl = document.getElementById('c-moy');
+  if (cMoyEl) setText('c-moy', cultMoy + '<span class="kunit"> pers./sortie</span>');
 
   // ── Rendu détail sorties culturelles ──
   const cultList = document.getElementById('cult-sorties-list');
@@ -936,7 +953,8 @@ function processAndRender(items, rawItems) {
       </div></div>`;
     } else {
       // Récupérer les données brutes pour afficher le détail
-      const cultRaw = filtered.filter(isCult);
+      const cultRaw = filtered.filter(isCult)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
       cultList.innerHTML = cultRaw.map(r => {
         const f = rawItems.find(i => i.fields && i.fields.field_3 === r.date) || {};
         const ff = f.fields || {};
@@ -1018,9 +1036,15 @@ function processAndRender(items, rawItems) {
   });
 
   // ── Label période ──
-  const periodeStr = currentPeriode === 'civil'
-    ? `Année ${new Date().getFullYear()}`
-    : `12 mois glissants`;
+  const now2 = new Date();
+  let periodeStr;
+  if (currentPeriode === 'civil') {
+    periodeStr = `Année ${now2.getFullYear()}`;
+  } else {
+    const start13 = new Date(now2.getFullYear() - 1, now2.getMonth(), 1);
+    const fmtDate = (d) => d.toLocaleDateString('fr-FR', {month:'short', year:'numeric'});
+    periodeStr = `${fmtDate(start13)} – ${fmtDate(now2)}`;
+  }
 
   // Mettre à jour footer et sous-titres
   const footerEl = document.getElementById('footer-global');
