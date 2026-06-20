@@ -834,6 +834,10 @@ function processAndRender(items, rawItems) {
   setText('c-partic',  cultPartT + '<span class="kunit"> pers.</span>');
 
   // ── Rendu détail sorties culturelles ──
+  // DEBUG temporaire
+  const cultDebug = rawItems.filter(i => i.fields && /sortie culturelle|culturel/i.test((i.fields.field_5||'').toString()));
+  if (cultDebug.length > 0) console.log('🏛 Sortie culturelle fields:', JSON.stringify(cultDebug[0].fields, null, 2));
+
   const cultList = document.getElementById('cult-sorties-list');
   if (cultList) {
     if (cultRows.length === 0) {
@@ -846,12 +850,26 @@ function processAndRender(items, rawItems) {
       // Récupérer les données brutes pour afficher le détail
       const cultRaw = filtered.filter(isCult);
       cultList.innerHTML = cultRaw.map(r => {
-        const f = items.find(i => i.fields && i.fields.field_3 === r.date) || {};
+        const f = rawItems.find(i => i.fields && i.fields.field_3 === r.date) || {};
         const ff = f.fields || {};
         const dateStr = r.date ? new Date(r.date).toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'}) : '—';
+        // Mapping confirmé depuis le CSV :
+        // field_22 = descriptif général
+        // field_23 = distance rando
+        // field_24 = durée rando
+        // field_25 = dénivelé rando
+        // field_26 = lieu rando
+        // field_27 = participants rando
+        // field_28 = lieu visite
+        // field_29 = descriptif visite
+        // field_30 = participants visite
         const lieuVisite   = (ff.field_28 || '—').toString();
         const descVisite   = (ff.field_29 || '').toString();
+        const partVisite   = (ff.field_30 || '—').toString();
         const lieuRando    = (ff.field_26 || '—').toString();
+        const distRando    = ff.field_23 ? parseFloat(ff.field_23) : 0;
+        const denivRando   = ff.field_25 ? parseFloat(ff.field_25) : 0;
+        const partRando    = (ff.field_27 || '—').toString();
         const descriptif   = (ff.field_22 || '').toString();
         return `
         <div class="card" style="margin-bottom:14px">
@@ -862,18 +880,20 @@ function processAndRender(items, rawItems) {
               <div style="font-size:12px;color:var(--txt-l)">${dateStr}</div>
             </div>
           </div>
-          ${descVisite ? `<div style="font-size:12px;color:var(--txt);margin-bottom:10px">${descVisite}</div>` : ''}
+          ${descriptif ? `<div style="font-size:12px;color:var(--txt);margin-bottom:10px;font-style:italic">${descriptif}</div>` : ''}
           <div class="cult-cols" style="margin-top:10px">
             <div>
               <div class="cult-col-hdr">Visite</div>
               <div class="cult-field"><span class="cult-field-ico">🏛</span><span class="cult-field-lbl">Lieu</span><span class="cult-field-val">${lieuVisite}</span></div>
-              <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${ff.field_30 || r.participants}</span></div>
+              ${descVisite ? `<div class="cult-field"><span class="cult-field-ico">📝</span><span class="cult-field-lbl">Descriptif</span><span class="cult-field-val">${descVisite}</span></div>` : ''}
+              <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${partVisite}</span></div>
             </div>
             <div>
               <div class="cult-col-hdr">Randonnée associée</div>
               <div class="cult-field"><span class="cult-field-ico">📍</span><span class="cult-field-lbl">Lieu</span><span class="cult-field-val">${lieuRando}</span></div>
-              <div class="cult-field"><span class="cult-field-ico">📏</span><span class="cult-field-lbl">Distance</span><span class="cult-field-val">${r.distance} km</span></div>
-              <div class="cult-field"><span class="cult-field-ico">⛰</span><span class="cult-field-lbl">Dénivelé</span><span class="cult-field-val">${r.denivele} m</span></div>
+              <div class="cult-field"><span class="cult-field-ico">📏</span><span class="cult-field-lbl">Distance</span><span class="cult-field-val">${distRando} km</span></div>
+              <div class="cult-field"><span class="cult-field-ico">⛰</span><span class="cult-field-lbl">Dénivelé</span><span class="cult-field-val">${denivRando} m</span></div>
+              <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${partRando}</span></div>
             </div>
             <div>
               <div class="cult-col-hdr">Général</div>
