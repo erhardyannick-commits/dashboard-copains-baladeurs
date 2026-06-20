@@ -56,9 +56,8 @@ body { font-family:'Source Sans 3',sans-serif; background:var(--bg); color:var(-
 header {
   background:linear-gradient(135deg,var(--sp-dk) 0%,var(--sp) 100%);
   padding:20px 36px; display:flex; align-items:center; gap:18px;
-  box-shadow:0 3px 12px rgba(0,144,187,.35); position:relative; overflow:hidden;
+  box-shadow:0 3px 12px rgba(0,144,187,.35); position:relative;
 }
-header::before { content:''; position:absolute; right:-80px; top:-80px; width:280px; height:280px; border-radius:50%; background:rgba(255,255,255,.07); }
 .logo { width:52px; height:52px; background:#fff; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; color:var(--sp-dk); flex-shrink:0; box-shadow:0 3px 12px rgba(0,0,0,.15); z-index:1; }
 .h-info { z-index:1; }
 .h-info h1 { font-weight:700; font-size:22px; color:#fff; }
@@ -909,38 +908,37 @@ function processAndRender(items, rawItems) {
   document.getElementById('badge-nG').textContent = gV.seances;
   document.getElementById('badge-nB').textContent = gB.seances;
   document.getElementById('badge-nR').textContent = gR.seances;
-  setText('n-moy', nMoyParSeance.toFixed(1).replace('.',',') + '<span class="kunit"> pers./séance</span>');
+  setText('n-moy', Math.round(nMoyParSeance) + '<span class="kunit"> moy.</span>');
 
   // ── BÂTONS KPIs ──
   const bPartT = sum(batonRows,'participants');
   setText('b-seances', batonDates.length + '<span class="kunit"> séances</span>');
   setText('b-partic',  bPartT + '<span class="kunit"> pers.</span>');
-  setText('b-moy', (batonDates.length ? (bPartT/batonDates.length).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> pers./séance</span>');
+  setText('b-moy', (batonDates.length ? Math.round(bPartT/batonDates.length) : '—') + '<span class="kunit"> moy.</span>');
 
   // ── VÉLO KPIs ──
   const vDistT = sum(veloRows,'distance');
   const vPartT = sum(veloRows,'participants');
   const vNb    = veloDates.length;
-  const vMoy   = vNb ? (vPartT/vNb).toFixed(1).replace('.',',') : '—';
+  const vMoy   = vNb ? Math.round(vPartT/vNb) : '—';
   setText('v-sorties-k', vNb + '<span class="kunit"> sorties</span>');
   setText('v-dist',      fmt(vDistT) + '<span class="kunit"> km</span>');
   setText('v-partic',    vPartT + '<span class="kunit"> pers.</span>');
   setText('v-dist-moy',  (vNb ? (vDistT/vNb).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
-  // Ajouter moyenne participants si le KPI existe
   const vMoyEl = document.getElementById('v-moy');
-  if (vMoyEl) setText('v-moy', vMoy + '<span class="kunit"> pers./sortie</span>');
+  if (vMoyEl) setText('v-moy', vMoy + '<span class="kunit"> moy.</span>');
 
   // ── SORTIES CULTURELLES KPIs ──
   const cultDistT  = sum(cultRows,'distance');
   const cultDenivT = sum(cultRows,'denivele');
   const cultPartT  = sum(cultRows,'participants');
-  const cultMoy    = cultRows.length ? (cultPartT/cultRows.length).toFixed(1).replace('.',',') : '—';
+  const cultMoy    = cultRows.length ? Math.round(cultPartT/cultRows.length) : '—';
   setText('c-sorties', cultRows.length + '<span class="kunit"> sorties</span>');
   setText('c-dist',    fmt(cultDistT)  + '<span class="kunit"> km</span>');
   setText('c-deniv',   fmt(cultDenivT) + '<span class="kunit"> m</span>');
   setText('c-partic',  cultPartT + '<span class="kunit"> pers.</span>');
   const cMoyEl = document.getElementById('c-moy');
-  if (cMoyEl) setText('c-moy', cultMoy + '<span class="kunit"> pers./sortie</span>');
+  if (cMoyEl) setText('c-moy', cultMoy + '<span class="kunit"> moy.</span>');
 
   // ── Rendu détail sorties culturelles ──
   const cultList = document.getElementById('cult-sorties-list');
