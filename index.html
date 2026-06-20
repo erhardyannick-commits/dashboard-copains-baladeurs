@@ -382,43 +382,17 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
 <div class="page" id="pg-cult"><main>
   <div class="th"><div class="th-ico">🏛</div><div class="th-txt"><h2>Sorties Culturelles</h2><p id="th-cult">Visites patrimoine &amp; découvertes</p></div></div>
 
-  <div class="card" id="cult-content">
-    <div class="cult-empty">
-      <span class="cult-ico">🗺</span>
-      <h3>Données à compléter dans la Microsoft List</h3>
-      <p>Les sorties culturelles de la saison ne sont pas encore saisies dans la liste globale. Une fois ajoutées, elles apparaîtront ici automatiquement.</p>
-      <div class="cult-notice">
-        <span style="font-size:18px;flex-shrink:0">ℹ️</span>
-        <div>
-          <strong>Champs à renseigner dans la List</strong>
-          Pour chaque sortie : date · lieu de visite · lieu de randonnée · distance rando · dénivelé · nombre de participants · descriptif
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--gris-cl)">
-      <div style="font-weight:700;font-size:12px;color:var(--sp-dk);margin-bottom:14px;letter-spacing:1px;text-transform:uppercase">Structure attendue — exemple de sortie</div>
-      <div class="cult-cols">
-        <div>
-          <div class="cult-col-hdr">Visite</div>
-          <div class="cult-field"><span class="cult-field-ico">🏛</span><span class="cult-field-lbl">Lieu visite</span><span class="cult-field-val">Ex : Château de Bourlémont</span></div>
-          <div class="cult-field"><span class="cult-field-ico">📝</span><span class="cult-field-lbl">Descriptif</span><span class="cult-field-val">Visite guidée, conférence…</span></div>
-          <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">Nombre de personnes</span></div>
-        </div>
-        <div>
-          <div class="cult-col-hdr">Randonnée associée</div>
-          <div class="cult-field"><span class="cult-field-ico">📍</span><span class="cult-field-lbl">Lieu départ</span><span class="cult-field-val">Commune de départ</span></div>
-          <div class="cult-field"><span class="cult-field-ico">📏</span><span class="cult-field-lbl">Distance</span><span class="cult-field-val">km parcourus</span></div>
-          <div class="cult-field"><span class="cult-field-ico">⛰</span><span class="cult-field-lbl">Dénivelé</span><span class="cult-field-val">m de dénivelé +</span></div>
-        </div>
-        <div>
-          <div class="cult-col-hdr">Général</div>
-          <div class="cult-field"><span class="cult-field-ico">📅</span><span class="cult-field-lbl">Date</span><span class="cult-field-val">Date de la sortie</span></div>
-          <div class="cult-field"><span class="cult-field-ico">⏱</span><span class="cult-field-lbl">Durée</span><span class="cult-field-val">Durée totale</span></div>
-          <div class="cult-field"><span class="cult-field-ico">🤝</span><span class="cult-field-lbl">Bénévolat</span><span class="cult-field-val">Heures organisateur</span></div>
-        </div>
-      </div>
-    </div>
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k4">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="c-sorties">…</div><div class="klbl">Sorties organisées</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="c-dist">…</div><div class="klbl">Distance rando cumulée</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="c-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi b6"><span class="kico">👥</span><div class="kval" id="c-partic">…</div><div class="klbl">Participants cumulés</div></div>
   </div>
+
+  <div class="slbl">Détail des sorties</div>
+  <div id="cult-sorties-list"></div>
+
 </main></div>
 
 <!-- ══ VIE ASSO ══ -->
@@ -599,7 +573,7 @@ async function loadData(token) {
     }
 
     showLoading('Calcul des statistiques…', `${items.length} enregistrements chargés`);
-    processAndRender(items);
+    processAndRender(items, items);
     setAuthConnected(items.length);
 
   } catch(e) {
@@ -613,7 +587,7 @@ async function loadData(token) {
 // ══════════════════════════════════════════
 //  TRAITEMENT DES DONNÉES
 // ══════════════════════════════════════════
-function processAndRender(items) {
+function processAndRender(items, rawItems) {
   const rows = items.map(i => {
     const f = i.fields || {};
 
@@ -687,9 +661,9 @@ function processAndRender(items) {
       denivele     = gn('field_34');
       participants = gn('field_35');
     } else if (typeNorm.includes('visite') || typeNorm.includes('culturel') || typeNorm.includes('randovisite')) {
-      distance     = gn('field_24');
-      denivele     = gn('field_26');
-      participants = gn('field_28');
+      distance     = gn('field_23');
+      denivele     = gn('field_25');
+      participants = gn('field_27');
     }
 
     return {
@@ -722,7 +696,7 @@ function processAndRender(items) {
   const isNordic = r => /nordique/i.test(r.type);
   const isBaton  = r => /b.ton/i.test(r.type);
   const isVelo   = r => /v.lo|lotourisme/i.test(r.type);
-  const isCult   = r => /culturel|visite|randovisite/i.test(r.type);
+  const isCult   = r => /sortie culturelle|culturel|randovisite/i.test(r.type);
   const isVie    = r => /vie.*asso/i.test(r.categorie);
 
   const randoRows  = filtered.filter(isRando);
@@ -850,7 +824,67 @@ function processAndRender(items) {
   setText('v-partic',    vPartT + '<span class="kunit"> pers.</span>');
   setText('v-dist-moy',  (vNb ? (vDistT/vNb).toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
 
-  // ── VIE ASSO KPIs ──
+  // ── SORTIES CULTURELLES KPIs ──
+  const cultDistT  = sum(cultRows,'distance');
+  const cultDenivT = sum(cultRows,'denivele');
+  const cultPartT  = sum(cultRows,'participants');
+  setText('c-sorties', cultRows.length + '<span class="kunit"> sorties</span>');
+  setText('c-dist',    fmt(cultDistT)  + '<span class="kunit"> km</span>');
+  setText('c-deniv',   fmt(cultDenivT) + '<span class="kunit"> m</span>');
+  setText('c-partic',  cultPartT + '<span class="kunit"> pers.</span>');
+
+  // ── Rendu détail sorties culturelles ──
+  const cultList = document.getElementById('cult-sorties-list');
+  if (cultList) {
+    if (cultRows.length === 0) {
+      cultList.innerHTML = `<div class="card"><div class="cult-empty">
+        <span class="cult-ico">🗺</span>
+        <h3>Aucune sortie culturelle saisie</h3>
+        <p>Les sorties culturelles apparaîtront ici automatiquement une fois saisies dans la Microsoft List.</p>
+      </div></div>`;
+    } else {
+      // Récupérer les données brutes pour afficher le détail
+      const cultRaw = filtered.filter(isCult);
+      cultList.innerHTML = cultRaw.map(r => {
+        const f = items.find(i => i.fields && i.fields.field_3 === r.date) || {};
+        const ff = f.fields || {};
+        const dateStr = r.date ? new Date(r.date).toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'}) : '—';
+        const lieuVisite   = (ff.field_28 || '—').toString();
+        const descVisite   = (ff.field_29 || '').toString();
+        const lieuRando    = (ff.field_26 || '—').toString();
+        const descriptif   = (ff.field_22 || '').toString();
+        return `
+        <div class="card" style="margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+            <div style="font-size:28px">🏛</div>
+            <div>
+              <div style="font-weight:700;font-size:15px;color:var(--sp-dk)">${lieuVisite}</div>
+              <div style="font-size:12px;color:var(--txt-l)">${dateStr}</div>
+            </div>
+          </div>
+          ${descVisite ? `<div style="font-size:12px;color:var(--txt);margin-bottom:10px">${descVisite}</div>` : ''}
+          <div class="cult-cols" style="margin-top:10px">
+            <div>
+              <div class="cult-col-hdr">Visite</div>
+              <div class="cult-field"><span class="cult-field-ico">🏛</span><span class="cult-field-lbl">Lieu</span><span class="cult-field-val">${lieuVisite}</span></div>
+              <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${ff.field_30 || r.participants}</span></div>
+            </div>
+            <div>
+              <div class="cult-col-hdr">Randonnée associée</div>
+              <div class="cult-field"><span class="cult-field-ico">📍</span><span class="cult-field-lbl">Lieu</span><span class="cult-field-val">${lieuRando}</span></div>
+              <div class="cult-field"><span class="cult-field-ico">📏</span><span class="cult-field-lbl">Distance</span><span class="cult-field-val">${r.distance} km</span></div>
+              <div class="cult-field"><span class="cult-field-ico">⛰</span><span class="cult-field-lbl">Dénivelé</span><span class="cult-field-val">${r.denivele} m</span></div>
+            </div>
+            <div>
+              <div class="cult-col-hdr">Général</div>
+              <div class="cult-field"><span class="cult-field-ico">📅</span><span class="cult-field-lbl">Date</span><span class="cult-field-val">${dateStr}</span></div>
+              <div class="cult-field"><span class="cult-field-ico">🤝</span><span class="cult-field-lbl">Bénévolat</span><span class="cult-field-val">${r.benevolat} h</span></div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
   setText('vie-actions',  vieRows.length + '<span class="kunit"> actions</span>');
   setText('vie-benev-h',  fmt(sum(vieRows,'benevolat')) + '<span class="kunit"> h</span>');
   setText('vie-km-asso',  fmt(sum(vieRows,'deplacement')) + '<span class="kunit"> km</span>');
