@@ -786,8 +786,9 @@ function processAndRender(items, rawItems) {
   const isRando  = r => /animation.rand/i.test(r.type);
   const isNordic = r => /nordique/i.test(r.type);
   const isBaton  = r => /b.ton/i.test(r.type);
-  const isVelo   = r => /v.lo|lotourisme/i.test(r.type);
-  const isCult   = r => /sortie culturelle|culturel|randovisite/i.test(r.type);
+  const isVelo   = r => /v.lo/i.test(r.type); // Sortie Vélotourisme
+  const isCult   = r => /sortie culturelle/i.test(r.type);
+  const isAutre  = r => /autre activit/i.test(r.type);
   const isVie    = r => /vie.*asso/i.test(r.categorie);
 
   const randoRows  = filtered.filter(isRando);
@@ -1031,6 +1032,7 @@ function processAndRender(items, rawItems) {
     tfN, faN, moN, diN,
     batonRows, veloRows, filtered,
     vieRows, mLabels,
+    isNordic, isRando, isBaton, isVelo, isCult, isAutre,
   });
 
   // ── Label période ──
@@ -1174,30 +1176,32 @@ function rebuildCharts(d) {
   },{plugins:{legend:{display:false}},scales:{x:OX,y:{...OY,ticks:{stepSize:5}}}});
 
   // ── VIE ASSO ──
-  const typeLabels=['Nordique','Randonnée','Vie asso','Bâtons','Vélo','Autres'];
+  const typeLabels=['Nordique','Randonnée','Vie asso','Bâtons','Vélo','Culturel','Autre'];
   const vieBenevData = [
-    d.filtered.filter(r=>/nordique/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
-    d.filtered.filter(r=>/animation.rand/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isNordic).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isRando).reduce((s,r)=>s+r.benevolat,0),
     d.vieRows.reduce((s,r)=>s+r.benevolat,0),
-    d.filtered.filter(r=>/b.ton/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
-    d.filtered.filter(r=>/v.lo/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
-    d.filtered.filter(r=>!/nordique|animation.rand|vie|asso|b.ton|v.lo/i.test(r.type)).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isBaton).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isVelo).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isCult).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isAutre).reduce((s,r)=>s+r.benevolat,0),
   ];
   const vieKmData = [
-    d.filtered.filter(r=>/nordique/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
-    d.filtered.filter(r=>/animation.rand/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isNordic).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isRando).reduce((s,r)=>s+r.deplacement,0),
     d.vieRows.reduce((s,r)=>s+r.deplacement,0),
-    d.filtered.filter(r=>/b.ton/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
-    d.filtered.filter(r=>/v.lo/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
-    d.filtered.filter(r=>!/nordique|animation.rand|vie|asso|b.ton|v.lo/i.test(r.type)).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isBaton).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isVelo).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isCult).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isAutre).reduce((s,r)=>s+r.deplacement,0),
   ];
 
   mk('vie-benev','bar',{labels:typeLabels,datasets:[
-    {data:vieBenevData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.g5],borderRadius:5}
+    {data:vieBenevData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.nB,C.g5],borderRadius:5}
   ]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,title:{display:true,text:'heures',font:{size:10}}},y:{grid:{display:false}}}});
 
   mk('vie-km','bar',{labels:typeLabels,datasets:[
-    {data:vieKmData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.g5],borderRadius:5}
+    {data:vieKmData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.nB,C.g5],borderRadius:5}
   ]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,title:{display:true,text:'km',font:{size:10}}},y:{grid:{display:false}}}});
 }
 
