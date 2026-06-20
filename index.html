@@ -868,32 +868,33 @@ function processAndRender(items, rawItems) {
         const descriptif   = (ff.field_23 || '').toString();
         return `
         <div class="card" style="margin-bottom:14px">
-          <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
             <div style="font-size:28px">🏛</div>
-            <div>
-              <div style="font-weight:700;font-size:15px;color:var(--sp-dk)">${lieuVisite}</div>
-              <div style="font-size:12px;color:var(--txt-l)">${dateStr}</div>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:16px;color:var(--sp-dk)">${lieuVisite}</div>
+              <div style="font-size:12px;color:var(--txt-l);margin-top:2px">📅 ${dateStr}</div>
             </div>
+            <a href="https://www.google.com/maps/search/${encodeURIComponent(lieuVisite)}" 
+               target="_blank" rel="noopener"
+               style="background:var(--sp);color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap">
+              🗺 Voir sur Maps
+            </a>
           </div>
-          ${descriptif ? `<div style="font-size:12px;color:var(--txt);margin-bottom:10px;font-style:italic">${descriptif}</div>` : ''}
-          <div class="cult-cols" style="margin-top:10px">
+          ${descriptif ? `<div style="font-size:12px;color:var(--txt);margin-bottom:12px;font-style:italic;background:var(--gris-cl);padding:8px 12px;border-radius:6px">${descriptif}</div>` : ''}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div>
-              <div class="cult-col-hdr">Visite</div>
-              <div class="cult-field"><span class="cult-field-ico">🏛</span><span class="cult-field-lbl">Lieu</span><span class="cult-field-val">${lieuVisite}</span></div>
+              <div class="cult-col-hdr">🏛 Visite</div>
               ${descVisite ? `<div class="cult-field"><span class="cult-field-ico">📝</span><span class="cult-field-lbl">Descriptif</span><span class="cult-field-val">${descVisite}</span></div>` : ''}
               <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${partVisite}</span></div>
             </div>
             <div>
-              <div class="cult-col-hdr">Randonnée associée</div>
-              <div class="cult-field"><span class="cult-field-ico">📍</span><span class="cult-field-lbl">Lieu</span><span class="cult-field-val">${lieuRando}</span></div>
+              <div class="cult-col-hdr">🥾 Randonnée associée</div>
+              <div class="cult-field"><span class="cult-field-ico">📍</span><span class="cult-field-lbl">Lieu</span>
+                <a href="https://www.google.com/maps/search/${encodeURIComponent(lieuRando)}" target="_blank" rel="noopener" style="color:var(--sp);font-weight:600">${lieuRando}</a>
+              </div>
               <div class="cult-field"><span class="cult-field-ico">📏</span><span class="cult-field-lbl">Distance</span><span class="cult-field-val">${distRando} km</span></div>
               <div class="cult-field"><span class="cult-field-ico">⛰</span><span class="cult-field-lbl">Dénivelé</span><span class="cult-field-val">${denivRando} m</span></div>
               <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${partRando}</span></div>
-            </div>
-            <div>
-              <div class="cult-col-hdr">Général</div>
-              <div class="cult-field"><span class="cult-field-ico">📅</span><span class="cult-field-lbl">Date</span><span class="cult-field-val">${dateStr}</span></div>
-              <div class="cult-field"><span class="cult-field-ico">🤝</span><span class="cult-field-lbl">Bénévolat</span><span class="cult-field-val">${r.benevolat} h</span></div>
             </div>
           </div>
         </div>`;
