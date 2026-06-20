@@ -672,6 +672,15 @@ async function loadData(token) {
 // ══════════════════════════════════════════
 //  TRAITEMENT DES DONNÉES
 // ══════════════════════════════════════════
+// ── Helpers type — niveau global ──
+const isRando  = r => /animation.rand/i.test(r.type);
+const isNordic = r => /nordique/i.test(r.type);
+const isBaton  = r => /b.ton/i.test(r.type);
+const isVelo   = r => /v.lo/i.test(r.type);
+const isCult   = r => /sortie culturelle/i.test(r.type);
+const isAutre  = r => /autre activit/i.test(r.type);
+const isVie    = r => /vie.*asso/i.test(r.categorie);
+
 function processAndRender(items, rawItems) {
   // Mise en cache pour le toggle
   cachedItems = items;
@@ -781,15 +790,6 @@ function processAndRender(items, rawItems) {
 
   // ── Filtre par période (année civile ou 12 mois glissants) ──
   const filtered = filterByPeriode(allFiltered);
-
-  // ── Helpers type (basés sur les vrais noms SharePoint) ──
-  const isRando  = r => /animation.rand/i.test(r.type);
-  const isNordic = r => /nordique/i.test(r.type);
-  const isBaton  = r => /b.ton/i.test(r.type);
-  const isVelo   = r => /v.lo/i.test(r.type); // Sortie Vélotourisme
-  const isCult   = r => /sortie culturelle/i.test(r.type);
-  const isAutre  = r => /autre activit/i.test(r.type);
-  const isVie    = r => /vie.*asso/i.test(r.categorie);
 
   const randoRows  = filtered.filter(isRando);
   const nordicRows = filtered.filter(isNordic);
@@ -1032,7 +1032,6 @@ function processAndRender(items, rawItems) {
     tfN, faN, moN, diN,
     batonRows, veloRows, filtered,
     vieRows, mLabels,
-    isNordic, isRando, isBaton, isVelo, isCult, isAutre,
   });
 
   // ── Label période ──
