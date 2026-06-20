@@ -302,7 +302,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
     <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="n-dist">…</div><div class="klbl">Distance totale (3 groupes)</div></div>
     <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="n-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
     <div class="kpi b6"><span class="kico">👥</span><div class="kval" id="n-partic">…</div><div class="klbl">Participants cumulés</div></div>
-    <div class="kpi b4"><span class="kico">👤</span><div class="kval" id="n-moy">…</div><div class="klbl">Participants / séance (par groupe)</div></div>
+    <div class="kpi b4"><span class="kico">👤</span><div class="kval" id="n-moy">…</div><div class="klbl">Participants moy. / séance</div></div>
   </div>
 
   <!-- ORDRE CORRIGÉ : Vert / Bleu / Rouge -->
@@ -475,9 +475,9 @@ function filterByPeriode(rows) {
       return d.getFullYear() === yr;
     });
   } else {
-    // 12 mois glissants : mois en cours + 11 mois précédents
-    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0); // fin du mois courant
-    const start = new Date(now.getFullYear() - 1, now.getMonth(), 1); // début du même mois l'an dernier
+    // 12 mois glissants : du 1er du mois suivant il y a 12 mois → fin du mois courant
+    const start = new Date(now.getFullYear() - 1, now.getMonth() + 1, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return rows.filter(r => {
       const d = new Date(r.date);
       return d >= start && d <= end;
@@ -1041,9 +1041,11 @@ function processAndRender(items, rawItems) {
   if (currentPeriode === 'civil') {
     periodeStr = `Année ${now2.getFullYear()}`;
   } else {
-    const start13 = new Date(now2.getFullYear() - 1, now2.getMonth(), 1);
+    // 12 mois glissants : début = premier jour du mois suivant il y a 12 mois
+    const start12 = new Date(now2.getFullYear() - 1, now2.getMonth() + 1, 1);
+    const end12   = new Date(now2.getFullYear(), now2.getMonth() + 1, 0); // dernier jour du mois courant
     const fmtDate = (d) => d.toLocaleDateString('fr-FR', {month:'short', year:'numeric'});
-    periodeStr = `${fmtDate(start13)} – ${fmtDate(now2)}`;
+    periodeStr = `${fmtDate(start12)} – ${fmtDate(end12)}`;
   }
 
   // Mettre à jour footer et sous-titres
