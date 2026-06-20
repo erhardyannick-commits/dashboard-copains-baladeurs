@@ -196,7 +196,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
   <div class="logo">CB</div>
   <div class="h-info">
     <h1>Copains Baladeurs</h1>
-    <p id="h-subtitle">Tableau de bord · Jan–Juin 2026 · données statiques</p>
+    <p id="h-subtitle">Tableau de bord · données en attente de connexion</p>
   </div>
   <div class="h-tabs">
     <button class="tab on"  onclick="nav(this,'global')">🏠 Vue globale</button>
@@ -240,12 +240,9 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
     <div class="card"><h3>Participants par mois et par type d'activité</h3><canvas id="g-partic-month" style="max-height:200px"></canvas></div>
   </div>
 
-  <footer>Copains Baladeurs · FFRandonnée · Données SharePoint · Jan–Juin 2026</footer>
-</main></div>
-
-<!-- ══ RANDONNÉE ══ -->
+  <footer id="footer-global">Copains Baladeurs · FFRandonnée · Données SharePoint · Jan–Juin 2026</footer>
 <div class="page" id="pg-rando"><main>
-  <div class="th"><div class="th-ico">🥾</div><div class="th-txt"><h2>Animation Randonnée</h2><p>Sorties pédestres · Jan–Juin 2026</p></div></div>
+  <div class="th"><div class="th-ico">🥾</div><div class="th-txt"><h2>Animation Randonnée</h2><p id="th-rando">Sorties pédestres</p></div></div>
 
   <div class="slbl">Chiffres clés</div>
   <div class="krow k5">
@@ -283,7 +280,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
 
 <!-- ══ MARCHE NORDIQUE ══ -->
 <div class="page" id="pg-nordic"><main>
-  <div class="th"><div class="th-ico">🚶</div><div class="th-txt"><h2>Marche Nordique</h2><p>3 groupes de niveaux · Jan–Juin 2026</p></div></div>
+  <div class="th"><div class="th-ico">🚶</div><div class="th-txt"><h2>Marche Nordique</h2><p id="th-nordic">Marche Nordique · 3 groupes</p></div></div>
 
   <div class="slbl">Chiffres clés</div>
   <div class="krow k5">
@@ -343,14 +340,13 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
 
 <!-- ══ BÂTONS ══ -->
 <div class="page" id="pg-baton"><main>
-  <div class="th"><div class="th-ico">🎯</div><div class="th-txt"><h2>Bâtons Dynamiques</h2><p>Séances de gym avec bâtons · Jan–Juin 2026</p></div></div>
+  <div class="th"><div class="th-ico">🎯</div><div class="th-txt"><h2>Bâtons Dynamiques</h2><p id="th-baton">Séances de gym avec bâtons</p></div></div>
 
   <div class="slbl">Chiffres clés</div>
-  <div class="krow k4">
+  <div class="krow k3">
     <div class="kpi"><span class="kico">📅</span><div class="kval" id="b-seances">…</div><div class="klbl">Séances uniques (dédupliquées)</div></div>
     <div class="kpi b2"><span class="kico">👥</span><div class="kval" id="b-partic">…</div><div class="klbl">Participants cumulés</div></div>
     <div class="kpi b3"><span class="kico">👤</span><div class="kval" id="b-moy">…</div><div class="klbl">Participants / séance</div></div>
-    <div class="kpi b6"><span class="kico">⏱</span><div class="kval">1h30<span class="kunit"> moy.</span></div><div class="klbl">Durée moyenne</div></div>
   </div>
 
   <div class="slbl">Analyse</div>
@@ -362,7 +358,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
 
 <!-- ══ VÉLO ══ -->
 <div class="page" id="pg-velo"><main>
-  <div class="th"><div class="th-ico">🚴</div><div class="th-txt"><h2>Sortie Vélotourisme</h2><p>Sorties à vélo · Jan–Juin 2026</p></div></div>
+  <div class="th"><div class="th-ico">🚴</div><div class="th-txt"><h2>Sortie Vélotourisme</h2><p id="th-velo">Sorties à vélo</p></div></div>
 
   <div class="slbl">Chiffres clés</div>
   <div class="krow k4">
@@ -381,7 +377,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
 
 <!-- ══ SORTIES CULTURELLES ══ -->
 <div class="page" id="pg-cult"><main>
-  <div class="th"><div class="th-ico">🏛</div><div class="th-txt"><h2>Sorties Culturelles</h2><p>Visites patrimoine & découvertes · Jan–Juin 2026</p></div></div>
+  <div class="th"><div class="th-ico">🏛</div><div class="th-txt"><h2>Sorties Culturelles</h2><p id="th-cult">Visites patrimoine &amp; découvertes</p></div></div>
 
   <div class="card" id="cult-content">
     <div class="cult-empty">
@@ -424,7 +420,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
 
 <!-- ══ VIE ASSO ══ -->
 <div class="page" id="pg-vie"><main>
-  <div class="th"><div class="th-ico">📋</div><div class="th-txt"><h2>Vie de l'association</h2><p>Tâches, réunions, bénévolat · Jan–Juin 2026</p></div></div>
+  <div class="th"><div class="th-ico">📋</div><div class="th-txt"><h2>Vie de l'association</h2><p id="th-vie">Tâches, réunions, bénévolat</p></div></div>
 
   <div class="slbl">Chiffres clés</div>
   <div class="krow k4">
@@ -440,7 +436,7 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
     <div class="card tall"><h3>Kilomètres de déplacements par type</h3><canvas id="vie-km"></canvas></div>
   </div>
 
-  <footer>Copains Baladeurs · FFRandonnée · Données SharePoint · Jan–Juin 2026</footer>
+  <footer id="footer-vie">Copains Baladeurs · FFRandonnée · Données SharePoint</footer>
 </main></div>
 
 <script>
@@ -889,8 +885,35 @@ function processAndRender(items) {
     vieRows,
   });
 
+  // ── Dates min/max dynamiques ──
+  const validDates = filtered.map(r => new Date(r.date)).filter(d => !isNaN(d));
+  const dateMin = validDates.length ? new Date(Math.min(...validDates)) : null;
+  const dateMax = validDates.length ? new Date(Math.max(...validDates)) : null;
+  const fmtDate = (d) => d ? d.toLocaleDateString('fr-FR', {month:'short', year:'numeric'}) : '';
+  const periodeStr = dateMin && dateMax ? `${fmtDate(dateMin)} – ${fmtDate(dateMax)}` : 'Jan–Juin 2026';
+
+  // Mettre à jour footer et sous-titres
+  const footerEl = document.getElementById('footer-global');
+  if (footerEl) footerEl.textContent = `Copains Baladeurs · FFRandonnée · Données SharePoint · ${periodeStr}`;
+  const footerVie = document.getElementById('footer-vie');
+  if (footerVie) footerVie.textContent = `Copains Baladeurs · FFRandonnée · Données SharePoint · ${periodeStr}`;
+
+  // Sous-titres des onglets — textes de base fixes + période dynamique
+  const thLabels = {
+    'th-rando':  'Sorties pédestres',
+    'th-nordic': 'Marche Nordique · 3 groupes',
+    'th-baton':  'Séances de gym avec bâtons',
+    'th-velo':   'Sorties à vélo',
+    'th-cult':   'Visites patrimoine & découvertes',
+    'th-vie':    'Tâches, réunions, bénévolat',
+  };
+  Object.entries(thLabels).forEach(([id, label]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${label} · ${periodeStr}`;
+  });
+
   document.getElementById('h-subtitle').textContent =
-    `Tableau de bord · Jan–Juin 2026 · ${items ? filtered.length : '—'} enregistrements · données en temps réel`;
+    `Tableau de bord · ${periodeStr} · ${filtered.length} enregistrements · données en temps réel`;
 }
 
 // ══════════════════════════════════════════
@@ -1069,6 +1092,13 @@ function setAuthConnected(count) {
   document.getElementById('btn-refresh').style.display = 'inline-block';
   const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('last-update').textContent = `Mis à jour à ${now}`;
+
+  // Rafraîchissement automatique toutes les 10 minutes
+  if (window._autoRefreshTimer) clearInterval(window._autoRefreshTimer);
+  window._autoRefreshTimer = setInterval(() => {
+    console.log('🔄 Rafraîchissement automatique...');
+    loadData();
+  }, 10 * 60 * 1000);
 }function setAuthError(msg) {
   const bar = document.getElementById('auth-bar');
   bar.className = 'error';
