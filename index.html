@@ -188,6 +188,17 @@ footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; mar
     <span id="auth-status-text">Non connecté</span>
   </div>
   <span id="last-update"></span>
+  <!-- Toggle période -->
+  <div id="periode-toggle" style="display:none;align-items:center;gap:6px;background:rgba(255,255,255,.15);border-radius:8px;padding:3px">
+    <button id="btn-civil" onclick="setPeriode('civil')" 
+      style="font-family:'Source Sans 3',sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;background:#fff;color:var(--sp-dk);transition:all .15s">
+      Année civile
+    </button>
+    <button id="btn-glissant" onclick="setPeriode('glissant')"
+      style="font-family:'Source Sans 3',sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:#fff;transition:all .15s">
+      12 mois glissants
+    </button>
+  </div>
   <button id="btn-refresh" onclick="loadData()" style="display:none">🔄 Actualiser</button>
   <button id="btn-connect" onclick="connectAndLoad()">🔐 Se connecter à SharePoint</button>
 </div>
@@ -440,6 +451,81 @@ const GRAPH_SCOPE  = ['https://graph.microsoft.com/Sites.Read.All'];
 let msalApp   = null;
 let msalReady = false;
 let allCharts = {};
+let currentPeriode = 'civil'; // 'civil' ou 'glissant'
+let cachedItems = null; // cache des items chargés
+
+function setPeriode(mode) {
+  currentPeriode = mode;
+  // Mise à jour visuelle des boutons
+  document.getElementById('btn-civil').style.background    = mode === 'civil'    ? '#fff' : 'transparent';
+  document.getElementById('btn-civil').style.color         = mode === 'civil'    ? 'var(--sp-dk)' : '#fff';
+  document.getElementById('btn-glissant').style.background = mode === 'glissant' ? '#fff' : 'transparent';
+  document.getElementById('btn-glissant').style.color      = mode === 'glissant' ? 'var(--sp-dk)' : '#fff';
+  // Recalculer avec les données en cache
+  if (cachedItems) processAndRender(cachedItems, cachedItems);
+}
+
+function filterByPeriode(rows) {
+  const now = new Date();
+  if (currentPeriode === 'civil') {
+    // Année civile en cours
+    const yr = now.getFullYear();
+    return rows.filter(r => {
+      const d = new Date(r.date);
+      return d.getFullYear() === yr;
+    });
+  } else {
+    // 12 mois glissants : mois en cours + 11 mois précédents
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0); // fin du mois courant
+    const start = new Date(now.getFullYear() - 1, now.getMonth(), 1); // début du même mois l'an dernier
+    return rows.filter(r => {
+      const d = new Date(r.date);
+      return d >= start && d <= end;
+    });
+  }
+}
+
+// Génère les labels de mois selon la période
+function getMonthLabels() {
+  if (currentPeriode === 'civil') {
+    return ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+  } else {
+    // 13 mois : mois courant-12 → mois courant
+    const now = new Date();
+    const labels = [];
+    for (let i = 12; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      labels.push(d.toLocaleDateString('fr-FR', {month:'short', year:'2-digit'}));
+    }
+    return labels;
+  }
+}
+
+// Agrège les données par mois selon la période
+function byMonthPeriode(rows, key) {
+  if (currentPeriode === 'civil') {
+    const months = Array(12).fill(0);
+    rows.forEach(r => {
+      const d = new Date(r.date);
+      if (!isNaN(d)) months[d.getMonth()] += (r[key] || 0);
+    });
+    return months;
+  } else {
+    // 13 mois glissants
+    const now = new Date();
+    const months = Array(13).fill(0);
+    rows.forEach(r => {
+      const d = new Date(r.date);
+      if (!isNaN(d)) {
+        // Index = 12 - (mois courant - mois de la donnée en mois absolus)
+        const diffMonths = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+        const idx = 12 - diffMonths;
+        if (idx >= 0 && idx <= 12) months[idx] += (r[key] || 0);
+      }
+    });
+    return months;
+  }
+}
 
 // Vérification que MSAL est bien chargé
 function checkMsalLoaded() {
@@ -468,7 +554,7 @@ Chart.defaults.plugins.legend.labels.boxWidth=10;
 Chart.defaults.plugins.legend.labels.font={size:11};
 const OY={beginAtZero:true,grid:{color:'rgba(0,120,180,.07)'}};
 const OX={grid:{display:false}};
-const M=['Jan','Fév','Mar','Avr','Mai','Juin'];
+const M=['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
 
 // ══════════════════════════════════════════
 //  INIT MSAL
@@ -588,6 +674,9 @@ async function loadData(token) {
 //  TRAITEMENT DES DONNÉES
 // ══════════════════════════════════════════
 function processAndRender(items, rawItems) {
+  // Mise en cache pour le toggle
+  cachedItems = items;
+
   const rows = items.map(i => {
     const f = i.fields || {};
 
@@ -682,7 +771,7 @@ function processAndRender(items, rawItems) {
   });
 
   // ── Filtrage valeur aberrante (75km Nordique Vert 04/04) ──
-  const filtered = rows.map(r => {
+  const allFiltered = rows.map(r => {
     if (r.type.toLowerCase().includes('nordique') &&
         r.groupe.toLowerCase() === 'vert' &&
         r.distance > 30) {
@@ -690,6 +779,9 @@ function processAndRender(items, rawItems) {
     }
     return r;
   });
+
+  // ── Filtre par période (année civile ou 12 mois glissants) ──
+  const filtered = filterByPeriode(allFiltered);
 
   // ── Helpers type (basés sur les vrais noms SharePoint) ──
   const isRando  = r => /animation.rand/i.test(r.type);
@@ -899,25 +991,19 @@ function processAndRender(items, rawItems) {
   setText('vie-km-asso',  fmt(sum(vieRows,'deplacement')) + '<span class="kunit"> km</span>');
   setText('vie-km-total', fmt(sum(filtered,'deplacement')) + '<span class="kunit"> km</span>');
 
-  // ── Données par mois ──
-  const byMonth = (rows, key) => M.map((_,i) =>
-    rows.filter(r => { const d = new Date(r.date); return d.getMonth() === i; })
-        .reduce((s,r) => s + (r[key]||0), 0)
-  );
-  const countByMonth = (dates) => M.map((_,i) =>
-    dates.filter(d => { const dt = new Date(d); return dt.getMonth() === i; }).length
-  );
+  // ── Données par mois (selon période sélectionnée) ──
+  const mLabels = getMonthLabels();
 
-  const rPartMonth  = byMonth(randoRows,'participants');
-  const nVertMonth  = byMonth(nVert,'participants');
-  const nBleuMonth  = byMonth(nBleu,'participants');
-  const nRougeMonth = byMonth(nRouge,'participants');
-  const bPartMonth  = byMonth(batonRows,'participants');
-  const vPartMonth  = byMonth(veloRows,'participants');
-  const nPartMonth  = M.map((_,i) => (nVertMonth[i]||0)+(nBleuMonth[i]||0)+(nRougeMonth[i]||0));
+  const rPartMonth  = byMonthPeriode(randoRows,'participants');
+  const nVertMonth  = byMonthPeriode(nVert,'participants');
+  const nBleuMonth  = byMonthPeriode(nBleu,'participants');
+  const nRougeMonth = byMonthPeriode(nRouge,'participants');
+  const bPartMonth  = byMonthPeriode(batonRows,'participants');
+  const vPartMonth  = byMonthPeriode(veloRows,'participants');
+  const nPartMonth  = mLabels.map((_,i) => (nVertMonth[i]||0)+(nBleuMonth[i]||0)+(nRougeMonth[i]||0));
 
-  const rDistMonth  = byMonth(randoRows,'distance');
-  const rDenivMonth = byMonth(randoRows,'denivele');
+  const rDistMonth  = byMonthPeriode(randoRows,'distance');
+  const rDenivMonth = byMonthPeriode(randoRows,'denivele');
 
   // ── Graphiques ──
   rebuildCharts({
@@ -928,15 +1014,13 @@ function processAndRender(items, rawItems) {
     gV, gB, gR,
     tfN, faN, moN, diN,
     batonRows, veloRows, filtered,
-    vieRows,
+    vieRows, mLabels,
   });
 
-  // ── Dates min/max dynamiques ──
-  const validDates = filtered.map(r => new Date(r.date)).filter(d => !isNaN(d));
-  const dateMin = validDates.length ? new Date(Math.min(...validDates)) : null;
-  const dateMax = validDates.length ? new Date(Math.max(...validDates)) : null;
-  const fmtDate = (d) => d ? d.toLocaleDateString('fr-FR', {month:'short', year:'numeric'}) : '';
-  const periodeStr = dateMin && dateMax ? `${fmtDate(dateMin)} – ${fmtDate(dateMax)}` : 'Jan–Juin 2026';
+  // ── Label période ──
+  const periodeStr = currentPeriode === 'civil'
+    ? `Année ${new Date().getFullYear()}`
+    : `12 mois glissants`;
 
   // Mettre à jour footer et sous-titres
   const footerEl = document.getElementById('footer-global');
@@ -993,7 +1077,7 @@ function rebuildCharts(d) {
     y1:{...OY,position:'right',grid:{display:false},title:{display:true,text:'dénivelé/100m',font:{size:10}}}
   }});
 
-  mk('g-partic-month','bar',{labels:M,datasets:[
+  mk('g-partic-month','bar',{labels:d.mLabels,datasets:[
     {label:'Nordique',  data:d.nPartMonth,  backgroundColor:C.g1,borderRadius:3},
     {label:'Randonnée', data:d.rPartMonth,  backgroundColor:C.g2,borderRadius:3},
     {label:'Bâtons',    data:d.bPartMonth,  backgroundColor:C.g3,borderRadius:3},
@@ -1001,7 +1085,7 @@ function rebuildCharts(d) {
   ]},{plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true,...OX},y:{stacked:true,...OY}}});
 
   // ── RANDONNÉE ──
-  mk('r-partic-month','bar',{labels:M,datasets:[
+  mk('r-partic-month','bar',{labels:d.mLabels,datasets:[
     {label:'Participants',data:d.rPartMonth,backgroundColor:C.g2,borderRadius:5}
   ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
 
@@ -1011,7 +1095,7 @@ function rebuildCharts(d) {
       backgroundColor:[C.g4,C.g1,C.g2,C.g6],borderWidth:2,borderColor:'#fff'}]
   },{cutout:'55%',plugins:{legend:{display:false}}});
 
-  mk('r-dist-deniv','bar',{labels:M,datasets:[
+  mk('r-dist-deniv','bar',{labels:d.mLabels,datasets:[
     {label:'Distance (km)',    data:d.rDistMonth,                                      backgroundColor:a(C.g2,.75),borderRadius:4,yAxisID:'y'},
     {label:'Dénivelé (/10m)', data:d.rDenivMonth.map(v=>Math.round(v/10)),            backgroundColor:a(C.g3,.7), borderRadius:4,yAxisID:'y1'},
   ]},{plugins:{legend:{position:'bottom'}},scales:{
@@ -1021,7 +1105,7 @@ function rebuildCharts(d) {
   }});
 
   // ── NORDIQUE — ordre Vert / Bleu / Rouge ──
-  mk('n-partic-month','bar',{labels:M,datasets:[
+  mk('n-partic-month','bar',{labels:d.mLabels,datasets:[
     {label:'🟢 Vert (Débutants)',  data:d.nVertMonth,  backgroundColor:C.nG,borderRadius:3},
     {label:'🔵 Bleu (Interméd.)', data:d.nBleuMonth,  backgroundColor:C.nB,borderRadius:3},
     {label:'🔴 Rouge (Confirmés)',data:d.nRougeMonth, backgroundColor:C.nR,borderRadius:3},
@@ -1034,7 +1118,7 @@ function rebuildCharts(d) {
   },{cutout:'58%',plugins:{legend:{display:false}}});
 
   // ── BÂTONS ──
-  mk('b-partic-month','bar',{labels:M,datasets:[
+  mk('b-partic-month','bar',{labels:d.mLabels,datasets:[
     {label:'Participants',data:d.bPartMonth,backgroundColor:C.g3,borderRadius:5}
   ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
 
@@ -1049,7 +1133,7 @@ function rebuildCharts(d) {
   },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,ticks:{stepSize:2}},y:{grid:{display:false}}}});
 
   // ── VÉLO ──
-  mk('v-partic-month','bar',{labels:M,datasets:[
+  mk('v-partic-month','bar',{labels:d.mLabels,datasets:[
     {label:'Participants',data:d.vPartMonth,backgroundColor:C.g6,borderRadius:5}
   ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
 
@@ -1136,13 +1220,13 @@ function setAuthConnected(count) {
     `Connecté — ${count} enregistrements chargés depuis SharePoint`;
   document.getElementById('btn-connect').style.display = 'none';
   document.getElementById('btn-refresh').style.display = 'inline-block';
+  document.getElementById('periode-toggle').style.display = 'flex';
   const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('last-update').textContent = `Mis à jour à ${now}`;
 
   // Rafraîchissement automatique toutes les 10 minutes
   if (window._autoRefreshTimer) clearInterval(window._autoRefreshTimer);
   window._autoRefreshTimer = setInterval(() => {
-    console.log('🔄 Rafraîchissement automatique...');
     loadData();
   }, 10 * 60 * 1000);
 }function setAuthError(msg) {
