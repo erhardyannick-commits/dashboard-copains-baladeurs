@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copains Baladeurs — Tableau de bord</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- MSAL v2 via unpkg -->
+<script src="https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap');
+:root {
+  --sp:    #00B4E3;
+  --sp-dk: #0090BB;
+  --sp-xl: #E3F7FD;
+  --g1: #00B4E3;
+  --g2: #0078D4; --g3: #00638A;
+  --g4: #5BC4E8; --g5: #A8DFF5; --g6: #003F6E;
+  --nR: #E04050; --nB: #0060C0; --nG: #2E8040;
+  --bg: #F3F6FA; --blanc: #FFFFFF; --gris-cl: #EBF0F5;
+  --gris-bd: #D0DCE8; --txt: #2C3E50; --txt-l: #6A7E8E;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Source Sans 3',sans-serif; background:var(--bg); color:var(--txt); }
+
+/* ── BANNIÈRE CONNEXION ── */
+#auth-bar {
+  background: linear-gradient(90deg, #003F6E, #0060C0);
+  color: #fff; padding: 10px 24px;
+  display: flex; align-items: center; gap: 14px;
+  font-size: 13px; flex-wrap: wrap;
+}
+#auth-bar.connected { background: linear-gradient(90deg, #1a5e2a, #2E8040); }
+#auth-bar.error     { background: linear-gradient(90deg, #7a1020, #E04050); }
+#auth-status { flex: 1; display:flex; align-items:center; gap:8px; }
+#auth-status .dot { width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.4); flex-shrink:0; }
+#auth-bar.connected .dot { background:#A0FFB0; }
+#auth-bar.error .dot     { background:#FFAAAA; }
+#btn-connect {
+  background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+  color: #fff; font-family:'Source Sans 3',sans-serif; font-weight:600;
+  font-size: 12px; padding: 6px 16px; border-radius: 6px; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+#btn-connect:hover { background: rgba(255,255,255,.35); }
+#btn-connect:disabled { opacity:.5; cursor:default; }
+#btn-refresh {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: #fff; font-family:'Source Sans 3',sans-serif; font-weight:600;
+  font-size: 12px; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  transition: all .15s; display:none;
+}
+#btn-refresh:hover { background: rgba(255,255,255,.28); }
+#last-update { font-size:11px; opacity:.7; }
+
+header {
+  background:linear-gradient(135deg,var(--sp-dk) 0%,var(--sp) 100%);
+  padding:20px 36px; display:flex; align-items:center; gap:18px;
+  box-shadow:0 3px 12px rgba(0,144,187,.35); position:relative;
+}
+.logo { width:52px; height:52px; background:#fff; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; color:var(--sp-dk); flex-shrink:0; box-shadow:0 3px 12px rgba(0,0,0,.15); z-index:1; }
+.h-info { z-index:1; }
+.h-info h1 { font-weight:700; font-size:22px; color:#fff; }
+.h-info p  { font-size:12px; color:rgba(255,255,255,.72); margin-top:2px; }
+#h-subtitle { font-size:12px; color:rgba(255,255,255,.72); margin-top:2px; }
+.h-tabs { display:flex; gap:5px; margin-left:auto; z-index:1; flex-wrap:wrap; }
+.tab { background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); color:#fff; font-family:'Source Sans 3',sans-serif; font-weight:600; font-size:12px; padding:6px 13px; border-radius:6px; cursor:pointer; transition:all .15s; white-space:nowrap; }
+.tab:hover { background:rgba(255,255,255,.3); }
+.tab.on { background:#fff; color:var(--sp-dk); border-color:#fff; }
+
+.page { display:none; }
+.page.on { display:block; }
+main { max-width:1280px; margin:0 auto; padding:26px 24px 52px; }
+
+.slbl { font-weight:700; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--sp-dk); margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+.slbl::after { content:''; flex:1; height:1px; background:var(--sp); opacity:.22; }
+
+.krow { display:grid; gap:12px; margin-bottom:20px; }
+.k4 { grid-template-columns:repeat(4,1fr); }
+.k5 { grid-template-columns:repeat(5,1fr); }
+.k3 { grid-template-columns:repeat(3,1fr); }
+
+.kpi { background:var(--blanc); border-radius:10px; padding:16px 14px 13px; box-shadow:0 1px 6px rgba(0,120,180,.08); border-left:4px solid var(--sp); transition:transform .13s; }
+.kpi:hover { transform:translateY(-2px); }
+.kpi.b2{border-left-color:var(--g2);} .kpi.b3{border-left-color:var(--g3);}
+.kpi.b4{border-left-color:var(--g4);} .kpi.b6{border-left-color:var(--g6);}
+.kpi.nr{border-left-color:var(--nR);} .kpi.ng{border-left-color:var(--nG);}
+.kpi.nb{border-left-color:var(--nB);} .kpi.gs{border-left-color:var(--txt-l);}
+.kico { font-size:20px; margin-bottom:7px; display:block; }
+.kval { font-weight:700; font-size:26px; line-height:1; color:var(--sp); }
+.kpi.b2 .kval{color:var(--g2);} .kpi.b3 .kval{color:var(--g3);}
+.kpi.b4 .kval{color:var(--g4);} .kpi.b6 .kval{color:var(--g6);}
+.kpi.nr .kval{color:var(--nR);} .kpi.ng .kval{color:var(--nG);}
+.kpi.nb .kval{color:var(--nB);} .kpi.gs .kval{color:var(--txt-l);}
+.kunit { font-size:12px; font-weight:600; opacity:.6; }
+.klbl  { font-size:11px; color:var(--txt-l); margin-top:4px; }
+
+.g2 { display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-bottom:18px; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
+.g1 { margin-bottom:18px; }
+
+.card { background:var(--blanc); border-radius:10px; padding:18px 18px 14px; box-shadow:0 1px 6px rgba(0,120,180,.08); }
+.card h3 { font-weight:700; font-size:12px; color:var(--txt); margin-bottom:12px; line-height:1.3; }
+.card canvas { max-height:200px; }
+.card.tall canvas { max-height:230px; }
+
+.th { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg,var(--sp-dk),var(--sp)); border-radius:10px; padding:16px 20px; margin-bottom:18px; box-shadow:0 3px 10px rgba(0,144,187,.22); }
+.th-ico { font-size:32px; }
+.th-txt h2 { font-weight:700; font-size:18px; color:#fff; }
+.th-txt p  { font-size:12px; color:rgba(255,255,255,.72); margin-top:2px; }
+
+/* ── Groupes Nordique ── */
+.ng-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:18px; }
+.ng-card { background:var(--blanc); border-radius:10px; padding:16px; box-shadow:0 1px 6px rgba(0,120,180,.08); }
+.ng-card.nr { border-top:3px solid var(--nR); }
+.ng-card.nb { border-top:3px solid var(--nB); }
+.ng-card.ng { border-top:3px solid var(--nG); }
+.ng-title { display:flex; align-items:center; gap:8px; margin-bottom:12px; font-weight:700; font-size:13px; }
+.ng-title.nr{color:var(--nR);} .ng-title.nb{color:var(--nB);} .ng-title.ng{color:var(--nG);}
+.ng-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ng-stat-val { font-weight:700; font-size:20px; line-height:1; }
+.ng-stat-lbl { font-size:10px; color:var(--txt-l); margin-top:2px; }
+.nr .ng-stat-val{color:var(--nR);} .nb .ng-stat-val{color:var(--nB);} .ng .ng-stat-val{color:var(--nG);}
+
+.nbadge { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:6px; font-size:11px; font-weight:700; margin:3px; }
+.nbadge.nr{background:#FDDCDC;color:#801010;} .nbadge.nb{background:#D5E4FF;color:#002880;} .nbadge.ng{background:#D8F0D8;color:#105010;}
+.dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+.dbadge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; margin:3px; }
+.dbadge.tf{background:#D5EEF8;color:#005A80;} .dbadge.fa{background:#D5EDF0;color:#005060;}
+.dbadge.mo{background:#D5E4F5;color:#003880;} .dbadge.di{background:#D5DCF8;color:#002080;}
+
+/* ── Sortie culturelle ── */
+.cult-empty { text-align:center; padding:40px 20px; }
+.cult-empty .cult-ico { font-size:52px; margin-bottom:16px; display:block; }
+.cult-empty h3 { font-weight:700; font-size:16px; color:var(--sp-dk); margin-bottom:8px; }
+.cult-empty p  { font-size:13px; color:var(--txt-l); max-width:480px; margin:0 auto; line-height:1.6; }
+.cult-col-hdr { font-weight:700; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--sp-dk); padding-bottom:8px; border-bottom:2px solid var(--sp); margin-bottom:10px; }
+.cult-field { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--gris-cl); font-size:12px; }
+.cult-field:last-child { border-bottom:none; }
+.cult-field-ico { font-size:16px; flex-shrink:0; }
+.cult-field-lbl { color:var(--txt-l); min-width:90px; }
+.cult-field-val { font-weight:600; color:var(--txt); }
+
+/* ── Spinner chargement ── */
+.loading-overlay {
+  position:fixed; inset:0; background:rgba(243,246,250,.88);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:100; gap:16px;
+}
+.spinner {
+  width:42px; height:42px; border:4px solid var(--gris-bd);
+  border-top-color:var(--sp); border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-msg { font-weight:600; font-size:14px; color:var(--sp-dk); }
+.loading-sub { font-size:12px; color:var(--txt-l); }
+
+footer { text-align:center; font-size:11px; color:var(--txt-l); opacity:.55; margin-top:30px; padding-top:16px; border-top:1px solid var(--gris-bd); }
+
+@media(max-width:900px){
+  .k4,.k5,.k3,.ng-grid { grid-template-columns:repeat(2,1fr); }
+  .g2,.g3 { grid-template-columns:1fr; }
+  header { flex-wrap:wrap; padding:16px; }
+  .h-tabs { margin-left:0; width:100%; flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
+  main { padding:14px 12px 40px; }
+  #auth-bar { padding:8px 14px; font-size:12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Overlay chargement — caché par défaut, affiché uniquement pendant le chargement des données -->
+<div class="loading-overlay" id="loading-overlay" style="display:none">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loading-msg">Chargement des données…</div>
+  <div class="loading-sub" id="loading-sub">Lecture de la Microsoft List</div>
+</div>
+
+<!-- Barre de connexion -->
+<div id="auth-bar">
+  <div id="auth-status">
+    <div class="dot"></div>
+    <span id="auth-status-text">Non connecté</span>
+  </div>
+  <span id="last-update"></span>
+  <!-- Toggle période -->
+  <div id="periode-toggle" style="display:none;align-items:center;gap:6px;background:rgba(255,255,255,.15);border-radius:8px;padding:3px">
+    <button id="btn-civil" onclick="setPeriode('civil')" 
+      style="font-family:'Source Sans 3',sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;background:#fff;color:var(--sp-dk);transition:all .15s">
+      Année civile
+    </button>
+    <button id="btn-glissant" onclick="setPeriode('glissant')"
+      style="font-family:'Source Sans 3',sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:#fff;transition:all .15s">
+      12 mois glissants
+    </button>
+  </div>
+  <button id="btn-refresh" onclick="loadData()" style="display:none">🔄 Actualiser</button>
+  <button id="btn-connect" onclick="connectAndLoad()">🔐 Se connecter à SharePoint</button>
+</div>
+
+<header>
+  <div class="logo">CB</div>
+  <div class="h-info">
+    <h1>Copains Baladeurs</h1>
+    <p id="h-subtitle">Tableau de bord · données en attente de connexion</p>
+  </div>
+  <div class="h-tabs">
+    <button class="tab on"  onclick="nav(this,'global')">🏠 Vue globale</button>
+    <button class="tab" onclick="nav(this,'rando')">🥾 Randonnée</button>
+    <button class="tab" onclick="nav(this,'nordic')">🚶 Marche Nordique</button>
+    <button class="tab" onclick="nav(this,'baton')">🎯 Bâtons Dyn.</button>
+    <button class="tab" onclick="nav(this,'velo')">🚴 Vélo</button>
+    <button class="tab" onclick="nav(this,'cult')">🏛 Sorties Culturelles</button>
+    <button class="tab" onclick="nav(this,'vie')">📋 Vie Asso</button>
+  </div>
+</header>
+
+<!-- ══ VUE GLOBALE ══ -->
+<div class="page on" id="pg-global"><main>
+  <div class="slbl">Chiffres clés — saison en cours</div>
+  <div class="krow k4">
+    <div class="kpi"><span class="kico">🎒</span><div class="kval" id="k-jours">…</div><div class="klbl">Jours d'activité (séances uniques)</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="k-dist">…</div><div class="klbl">Distance totale parcourue</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="k-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi b6"><span class="kico">🤝</span><div class="kval" id="k-benev">…</div><div class="klbl">Heures de bénévolat</div></div>
+  </div>
+
+  <div class="slbl">Par type d'activité</div>
+  <div class="krow k5">
+    <div class="kpi"><span class="kico">🚶</span><div class="kval" id="k-nordic-s">…</div><div class="klbl">Marche Nordique</div></div>
+    <div class="kpi b2"><span class="kico">🥾</span><div class="kval" id="k-rando-s">…</div><div class="klbl">Animation Randonnée</div></div>
+    <div class="kpi b3"><span class="kico">🎯</span><div class="kval" id="k-baton-s">…</div><div class="klbl">Bâtons Dynamiques</div></div>
+    <div class="kpi b6"><span class="kico">🚴</span><div class="kval" id="k-velo-s">…</div><div class="klbl">Vélotourisme</div></div>
+    <div class="kpi gs"><span class="kico">🏛</span><div class="kval" id="k-cult-s">…</div><div class="klbl">Sorties culturelles</div></div>
+  </div>
+
+  <div class="slbl">Participation</div>
+  <div class="g3">
+    <div class="card"><h3>Participants cumulés par type</h3><canvas id="g-partic"></canvas></div>
+    <div class="card"><h3>Répartition des activités</h3><canvas id="g-donut"></canvas></div>
+    <div class="card"><h3>Distance & dénivelé par type</h3><canvas id="g-dist"></canvas></div>
+  </div>
+
+  <div class="slbl">Participants par mois — toutes activités</div>
+  <div class="g1">
+    <div class="card"><h3>Participants par mois et par type d'activité</h3><canvas id="g-partic-month" style="max-height:200px"></canvas></div>
+  </div>
+
+  <footer id="footer-global">Copains Baladeurs · FFRandonnée · Données SharePoint</footer>
+</main></div>
+
+<!-- ══ RANDONNÉE ══ -->
+<div class="page" id="pg-rando"><main>
+  <div class="th"><div class="th-ico">🥾</div><div class="th-txt"><h2>Animation Randonnée</h2><p id="th-rando">Sorties pédestres</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k5">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="r-sorties">…</div><div class="klbl">Sorties organisées</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="r-dist">…</div><div class="klbl">Distance totale</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="r-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi b6"><span class="kico">👥</span><div class="kval" id="r-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b4"><span class="kico">👤</span><div class="kval" id="r-moy">…</div><div class="klbl">Participants / sortie</div></div>
+  </div>
+
+  <div class="slbl">Moyennes par sortie</div>
+  <div class="krow k4">
+    <div class="kpi b2"><span class="kico">🗺</span><div class="kval" id="r-dist-moy">…</div><div class="klbl">Distance moyenne</div></div>
+    <div class="kpi b3"><span class="kico">📐</span><div class="kval" id="r-deniv-moy">…</div><div class="klbl">Dénivelé moyen</div></div>
+    <div class="kpi b6"><span class="kico">⏱</span><div class="kval" id="r-duree-moy">…</div><div class="klbl">Durée moyenne</div></div>
+    <div class="kpi"><span class="kico">✅</span><div class="kval" id="r-pct-facile">…</div><div class="klbl">Sorties "Facile"</div></div>
+  </div>
+
+  <div class="slbl">Analyse</div>
+  <div class="g3">
+    <div class="card tall"><h3>Participants par mois</h3><canvas id="r-partic-month"></canvas></div>
+    <div class="card tall">
+      <h3>Répartition par difficulté</h3>
+      <canvas id="r-diff"></canvas>
+      <div style="margin-top:10px" id="r-diff-badges"></div>
+    </div>
+    <div class="card tall"><h3>Distance & dénivelé cumulés par mois</h3><canvas id="r-dist-deniv"></canvas></div>
+  </div>
+</main></div>
+
+<!-- ══ MARCHE NORDIQUE ══ -->
+<div class="page" id="pg-nordic"><main>
+  <div class="th"><div class="th-ico">🚶</div><div class="th-txt"><h2>Marche Nordique</h2><p id="th-nordic">Marche Nordique · 3 groupes</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k5">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="n-seances">…</div><div class="klbl" id="n-seances-lbl">Séances (tous groupes)</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="n-dist">…</div><div class="klbl">Distance totale (3 groupes)</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="n-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi b6"><span class="kico">👥</span><div class="kval" id="n-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b4"><span class="kico">👤</span><div class="kval" id="n-moy">…</div><div class="klbl">Participants moy. / journée</div></div>
+  </div>
+
+  <!-- ORDRE CORRIGÉ : Vert / Bleu / Rouge -->
+  <div class="slbl">Par groupe de niveau</div>
+  <div class="ng-grid">
+    <div class="ng-card ng">
+      <div class="ng-title ng">🟢 Vert — Débutants</div>
+      <div class="ng-stats ng">
+        <div><div class="ng-stat-val" id="nG-seances">…</div><div class="ng-stat-lbl">séances</div></div>
+        <div><div class="ng-stat-val" id="nG-dist">…</div><div class="ng-stat-lbl">distance moy.</div></div>
+        <div><div class="ng-stat-val" id="nG-deniv">…</div><div class="ng-stat-lbl">dénivelé moy.</div></div>
+        <div><div class="ng-stat-val" id="nG-part">…</div><div class="ng-stat-lbl">participants moy.</div></div>
+      </div>
+    </div>
+    <div class="ng-card nb">
+      <div class="ng-title nb">🔵 Bleu — Intermédiaires</div>
+      <div class="ng-stats nb">
+        <div><div class="ng-stat-val" id="nB-seances">…</div><div class="ng-stat-lbl">séances</div></div>
+        <div><div class="ng-stat-val" id="nB-dist">…</div><div class="ng-stat-lbl">distance moy.</div></div>
+        <div><div class="ng-stat-val" id="nB-deniv">…</div><div class="ng-stat-lbl">dénivelé moy.</div></div>
+        <div><div class="ng-stat-val" id="nB-part">…</div><div class="ng-stat-lbl">participants moy.</div></div>
+      </div>
+    </div>
+    <div class="ng-card nr">
+      <div class="ng-title nr">🔴 Rouge — Confirmés</div>
+      <div class="ng-stats nr">
+        <div><div class="ng-stat-val" id="nR-seances">…</div><div class="ng-stat-lbl">séances</div></div>
+        <div><div class="ng-stat-val" id="nR-dist">…</div><div class="ng-stat-lbl">distance moy.</div></div>
+        <div><div class="ng-stat-val" id="nR-deniv">…</div><div class="ng-stat-lbl">dénivelé moy.</div></div>
+        <div><div class="ng-stat-val" id="nR-part">…</div><div class="ng-stat-lbl">participants moy.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slbl">Participants par mois</div>
+  <div class="g2">
+    <div class="card tall"><h3>Participants par mois et par groupe</h3><canvas id="n-partic-month"></canvas></div>
+    <div class="card">
+      <h3>Répartition des séances par groupe</h3>
+      <canvas id="n-donut"></canvas>
+      <div style="margin-top:10px;text-align:center">
+        <span class="nbadge ng"><span class="dot" style="background:var(--nG)"></span>Vert · <span id="badge-nG">…</span> séances · Débutants</span>
+        <span class="nbadge nb"><span class="dot" style="background:var(--nB)"></span>Bleu · <span id="badge-nB">…</span> séances · Interméd.</span>
+        <span class="nbadge nr"><span class="dot" style="background:var(--nR)"></span>Rouge · <span id="badge-nR">…</span> séances · Confirmés</span>
+      </div>
+    </div>
+  </div>
+</main></div>
+
+<!-- ══ BÂTONS ══ -->
+<div class="page" id="pg-baton"><main>
+  <div class="th"><div class="th-ico">🎯</div><div class="th-txt"><h2>Bâtons Dynamiques</h2><p id="th-baton">Séances de gym avec bâtons</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k3">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="b-seances">…</div><div class="klbl">Séances</div></div>
+    <div class="kpi b2"><span class="kico">👥</span><div class="kval" id="b-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b3"><span class="kico">👤</span><div class="kval" id="b-moy">…</div><div class="klbl">Participants / séance</div></div>
+  </div>
+
+  <div class="slbl">Analyse</div>
+  <div class="g2">
+    <div class="card tall"><h3>Participants par mois</h3><canvas id="b-partic-month"></canvas></div>
+    <div class="card tall"><h3>Participants moyens par séance, mois par mois</h3><canvas id="b-moy-month"></canvas></div>
+  </div>
+</main></div>
+
+<!-- ══ VÉLO ══ -->
+<div class="page" id="pg-velo"><main>
+  <div class="th"><div class="th-ico">🚴</div><div class="th-txt"><h2>Sortie Vélotourisme</h2><p id="th-velo">Sorties à vélo</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k5">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="v-sorties-k">…</div><div class="klbl">Sorties organisées</div></div>
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="v-dist">…</div><div class="klbl">Distance totale</div></div>
+    <div class="kpi b4"><span class="kico">🗺</span><div class="kval" id="v-dist-moy">…</div><div class="klbl">Distance moyenne / sortie</div></div>
+    <div class="kpi b3"><span class="kico">👥</span><div class="kval" id="v-partic">…</div><div class="klbl">Participants cumulés</div></div>
+    <div class="kpi b6"><span class="kico">👤</span><div class="kval" id="v-moy">…</div><div class="klbl">Participants moy. / sortie</div></div>
+  </div>
+
+  <div class="slbl">Analyse</div>
+  <div class="g2">
+    <div class="card tall"><h3>Participants par mois</h3><canvas id="v-partic-month"></canvas></div>
+    <div class="card tall"><h3>Participants par sortie</h3><canvas id="v-sorties"></canvas></div>
+  </div>
+</main></div>
+
+<!-- ══ SORTIES CULTURELLES ══ -->
+<div class="page" id="pg-cult"><main>
+  <div class="th"><div class="th-ico">🏛</div><div class="th-txt"><h2>Sorties Culturelles</h2><p id="th-cult">Visites patrimoine &amp; découvertes</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k4">
+    <div class="kpi"><span class="kico">📅</span><div class="kval" id="c-sorties">…</div><div class="klbl">Sorties organisées</div></div>
+    <div class="kpi b6"><span class="kico">🏛</span><div class="kval" id="c-partic">…</div><div class="klbl">Participants aux visites (cumul)</div></div>
+    <div class="kpi b4"><span class="kico">👤</span><div class="kval" id="c-moy">…</div><div class="klbl">Participants moy. / visite</div></div>
+    <div class="kpi b2"><span class="kico">🥾</span><div class="kval" id="c-partic-rando">…</div><div class="klbl">Participants aux randos associées</div></div>
+  </div>
+  <div class="krow k3">
+    <div class="kpi b2"><span class="kico">📏</span><div class="kval" id="c-dist">…</div><div class="klbl">Distance rando cumulée</div></div>
+    <div class="kpi b3"><span class="kico">⛰</span><div class="kval" id="c-deniv">…</div><div class="klbl">Dénivelé cumulé</div></div>
+    <div class="kpi"><span class="kico">🗺</span><div class="kval" id="c-dist-moy">…</div><div class="klbl">Distance rando moyenne</div></div>
+  </div>
+
+  <div class="slbl">Détail des sorties</div>
+  <div id="cult-sorties-list"></div>
+
+</main></div>
+
+<!-- ══ VIE ASSO ══ -->
+<div class="page" id="pg-vie"><main>
+  <div class="th"><div class="th-ico">📋</div><div class="th-txt"><h2>Vie de l'association</h2><p id="th-vie">Tâches, réunions, bénévolat</p></div></div>
+
+  <div class="slbl">Chiffres clés</div>
+  <div class="krow k4">
+    <div class="kpi gs"><span class="kico">📋</span><div class="kval" id="vie-actions">…</div><div class="klbl">Enregistrements vie asso</div></div>
+    <div class="kpi b2"><span class="kico">🤝</span><div class="kval" id="vie-benev-h">…</div><div class="klbl">Bénévolat vie asso</div></div>
+    <div class="kpi b3"><span class="kico">🚗</span><div class="kval" id="vie-km-asso">…</div><div class="klbl">Déplacements vie asso</div></div>
+    <div class="kpi b6"><span class="kico">🗺</span><div class="kval" id="vie-km-total">…</div><div class="klbl">Déplacements toutes activités</div></div>
+  </div>
+
+  <div class="slbl">Bénévolat & déplacements par type d'activité</div>
+  <div class="g2">
+    <div class="card tall"><h3>Heures de bénévolat par type</h3><canvas id="vie-benev"></canvas></div>
+    <div class="card tall"><h3>Kilomètres de déplacements par type</h3><canvas id="vie-km"></canvas></div>
+  </div>
+
+  <footer id="footer-vie">Copains Baladeurs · FFRandonnée · Données SharePoint</footer>
+</main></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG AZURE AD + SHAREPOINT
+// ══════════════════════════════════════════
+const MSAL_CONFIG = {
+  auth: {
+    clientId: '748f8a5b-2407-46ae-9ed4-135064583f02',
+    authority: 'https://login.microsoftonline.com/8d01b93c-683b-4710-b1a5-3b5441b836ff',
+    redirectUri: 'https://erhardyannick-commits.github.io/dashboard-copains-baladeurs',
+  },
+  cache: {
+    cacheLocation: 'sessionStorage',
+    storeAuthStateInCookie: false
+  }
+};
+
+const SP_HOSTNAME  = 'copainsbaladeurs.sharepoint.com';
+const SP_SITE_PATH = '/sites/doc';
+const LIST_NAME    = 'Liste globale';
+const GRAPH_SCOPE  = ['https://graph.microsoft.com/Sites.Read.All'];
+
+let msalApp   = null;
+let msalReady = false;
+let allCharts = {};
+let currentPeriode = 'civil'; // 'civil' ou 'glissant'
+let cachedItems = null; // cache des items chargés
+
+function setPeriode(mode) {
+  currentPeriode = mode;
+  // Mise à jour visuelle des boutons
+  document.getElementById('btn-civil').style.background    = mode === 'civil'    ? '#fff' : 'transparent';
+  document.getElementById('btn-civil').style.color         = mode === 'civil'    ? 'var(--sp-dk)' : '#fff';
+  document.getElementById('btn-glissant').style.background = mode === 'glissant' ? '#fff' : 'transparent';
+  document.getElementById('btn-glissant').style.color      = mode === 'glissant' ? 'var(--sp-dk)' : '#fff';
+  // Recalculer avec les données en cache
+  if (cachedItems) processAndRender(cachedItems);
+}
+
+function filterByPeriode(rows) {
+  const now = new Date();
+  if (currentPeriode === 'civil') {
+    // Année civile en cours
+    const yr = now.getFullYear();
+    return rows.filter(r => {
+      const d = new Date(r.date);
+      return d.getFullYear() === yr;
+    });
+  } else {
+    // 12 mois glissants : du 1er du mois suivant il y a 12 mois → fin du mois courant
+    const start = new Date(now.getFullYear() - 1, now.getMonth() + 1, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return rows.filter(r => {
+      const d = new Date(r.date);
+      return d >= start && d <= end;
+    });
+  }
+}
+
+// Génère les labels de mois selon la période
+function getMonthLabels() {
+  if (currentPeriode === 'civil') {
+    return ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+  } else {
+    // 13 mois : mois courant-12 → mois courant
+    const now = new Date();
+    const labels = [];
+    for (let i = 12; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      labels.push(d.toLocaleDateString('fr-FR', {month:'short', year:'2-digit'}));
+    }
+    return labels;
+  }
+}
+
+// Agrège les données par mois selon la période
+function byMonthPeriode(rows, key) {
+  if (currentPeriode === 'civil') {
+    const months = Array(12).fill(0);
+    rows.forEach(r => {
+      const d = new Date(r.date);
+      if (!isNaN(d)) months[d.getMonth()] += (r[key] || 0);
+    });
+    return months;
+  } else {
+    // 13 mois glissants
+    const now = new Date();
+    const months = Array(13).fill(0);
+    rows.forEach(r => {
+      const d = new Date(r.date);
+      if (!isNaN(d)) {
+        // Index = 12 - (mois courant - mois de la donnée en mois absolus)
+        const diffMonths = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+        const idx = 12 - diffMonths;
+        if (idx >= 0 && idx <= 12) months[idx] += (r[key] || 0);
+      }
+    });
+    return months;
+  }
+}
+
+// Vérification que MSAL est bien chargé
+function checkMsalLoaded() {
+  if (!window.msal || !window.msal.PublicClientApplication) {
+    console.error('MSAL v2 non disponible');
+    return null;
+  }
+  return window.msal;
+}
+
+// ══════════════════════════════════════════
+//  COULEURS GRAPHIQUES
+// ══════════════════════════════════════════
+const C = {
+  g1:'#00B4E3', g2:'#1A3C8B', g3:'#00C4A0',
+  g4:'#0050C8', g5:'#74C2E8', g6:'#5C7AB0',
+  nR:'#E04050', nB:'#0060C0', nG:'#2E8040',
+};
+function a(hex,op){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${op})`;
+}
+Chart.defaults.font.family="'Source Sans 3',sans-serif";
+Chart.defaults.color='#5A6E7E';
+Chart.defaults.plugins.legend.labels.boxWidth=10;
+Chart.defaults.plugins.legend.labels.font={size:11};
+const OY={beginAtZero:true,grid:{color:'rgba(0,120,180,.07)'}};
+const OX={grid:{display:false}};
+
+// ══════════════════════════════════════════
+//  INIT MSAL
+// ══════════════════════════════════════════
+function initMsal() {
+  try {
+    if (!window.msal || !window.msal.PublicClientApplication) return;
+    msalApp = new window.msal.PublicClientApplication(MSAL_CONFIG);
+    msalReady = true;
+
+    // Tentative silencieuse si compte déjà connu
+    const accounts = msalApp.getAllAccounts();
+    if (accounts.length > 0) {
+      msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] })
+        .then(r => { if (r && r.accessToken) loadData(r.accessToken); })
+        .catch(() => { /* pas de session → bouton visible */ });
+    }
+  } catch(e) {
+    console.error('MSAL:', e);
+  }
+}
+
+async function getToken(silentOnly) {
+  if (!msalApp) throw new Error('MSAL non chargé');
+  // Essai silencieux d'abord
+  const accounts = msalApp.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const r = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPE, account: accounts[0] });
+      return r.accessToken;
+    } catch(e) { /* → popup */ }
+  }
+  // Actualisation automatique : jamais de fenêtre surgissante
+  if (silentOnly) throw new Error('Session expirée — cliquez sur « Se connecter »');
+  // Popup Microsoft
+  const r = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPE });
+  return r.accessToken;
+}
+
+async function connectAndLoad() {
+  if (!msalApp) {
+    setAuthError('MSAL non chargé — rechargez la page');
+    return;
+  }
+  document.getElementById('btn-connect').disabled = true;
+  showLoading('Connexion Microsoft…', 'Fenêtre de connexion en cours d\'ouverture');
+  try {
+    const token = await getToken();
+    if (token) await loadData(token);
+  } catch(e) {
+    setAuthError(e.message);
+  } finally {
+    document.getElementById('btn-connect').disabled = false;
+    hideLoading();
+  }
+}
+
+// ══════════════════════════════════════════
+//  CHARGEMENT DONNÉES SHAREPOINT
+// ══════════════════════════════════════════
+async function loadData(token, silentOnly) {
+  if (!token) {
+    try { token = await getToken(silentOnly); }
+    catch(e) { setAuthError(e.message); return; }
+  }
+  showLoading('Connexion à SharePoint…', 'Récupération de la Microsoft List');
+  try {
+    // 1. Trouver le site
+    const siteResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (!siteResp.ok) throw new Error('Site SharePoint introuvable (vérifiez les droits Sites.Read.All)');
+    const siteData = await siteResp.json();
+    const siteId = siteData.id;
+
+    // 2. Trouver la liste
+    const listsResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$filter=displayName eq '${encodeURIComponent(LIST_NAME)}'`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    const listsData = await listsResp.json();
+    if (!listsData.value || listsData.value.length === 0)
+      throw new Error(`Liste "${LIST_NAME}" introuvable sur ce site`);
+    const listId = listsData.value[0].id;
+
+    // 3. Charger tous les items avec tous les champs (pagination)
+    showLoading('Chargement des données…', 'Lecture de la Liste globale');
+    let items = [];
+    // On demande tous les champs field_3 à field_51 explicitement
+    const fields = ['field_3','field_4','field_5','field_6','field_7','field_8','field_9','field_10',
+      'field_11','field_12','field_13','field_14','field_15','field_16','field_17','field_18','field_19',
+      'field_20','field_21','field_22','field_23','field_24','field_25','field_26','field_27','field_28',
+      'field_29','field_30','field_31','field_32','field_33','field_34','field_35','field_36','field_37',
+      'field_38','field_39','field_40','field_41','field_42','field_43','field_44','field_45','field_46',
+      'field_47','field_48','field_49','field_50','field_51','Title','Annulee','Coanimation'].join(',');
+    let url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields($select=${fields})&$top=999`;
+    while (url) {
+      const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) throw new Error('Erreur lecture des items : ' + r.status);
+      const d = await r.json();
+      items = items.concat(d.value || []);
+      url = d['@odata.nextLink'] || null;
+    }
+
+    showLoading('Calcul des statistiques…', `${items.length} enregistrements chargés`);
+    processAndRender(items);
+    setAuthConnected(items.length);
+
+  } catch(e) {
+    console.error(e);
+    setAuthError(e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ══════════════════════════════════════════
+//  TRAITEMENT DES DONNÉES
+// ══════════════════════════════════════════
+// ── Helpers type — niveau global ──
+const isRando  = r => /animation.rand/i.test(r.type);
+const isNordic = r => /nordique/i.test(r.type);
+const isBaton  = r => /b.ton/i.test(r.type);
+const isVelo   = r => /v.lo/i.test(r.type);
+const isCult   = r => /sortie culturelle/i.test(r.type);
+const isVie    = r => /vie.*asso/i.test(r.categorie);
+const isAutre  = r => !isVie(r) && !isRando(r) && !isNordic(r) && !isBaton(r) && !isVelo(r) && !isCult(r); // Collecte MaRando, Autres activités…
+const escHtml  = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function processAndRender(items) {
+  // Mise en cache pour le toggle
+  cachedItems = items;
+
+  const rows = items.map(i => {
+    const f = i.fields || {};
+
+    const gn = (key) => {
+      const v = f[key];
+      if (v === undefined || v === null || v === '') return 0;
+      return parseFloat(v.toString().replace(',', '.')) || 0;
+    };
+    const gs = (key) => (f[key] || '').toString().trim();
+
+    // Mapping confirmé par debug console :
+    // field_3  = Date activité (ISO)
+    // field_4  = Catégorie ("Activité Copains Baladeurs" / "Vie de l'association")
+    // field_5  = Type activité ("Marche Nordique", "Animation Randonnée", etc.)
+    // field_6  = Rando distance
+    // field_7  = Rando durée
+    // field_8  = Rando dénivelé
+    // field_9  = Rando difficulté
+    // field_10 = Rando participants
+    // field_11 = Rando commentaire
+    // field_12 = Bâtons lieu
+    // field_13 = Bâtons participants
+    // field_14 = Bâtons distance
+    // field_15 = Bâtons durée
+    // field_16 = Bâtons commentaires
+    // field_17 = Nordique couleur (Bleu/Vert/Rouge)
+    // field_18 = Nordique distance
+    // field_19 = Nordique dénivelé
+    // field_20 = Nordique participants
+    // field_21 = Nordique liste noms
+    // field_22 = Nordique commentaires
+    // field_23 = RandoVisite descriptif
+    // field_24 = RandoVisite Rando distance
+    // field_25 = RandoVisite Rando durée
+    // field_26 = RandoVisite Rando dénivelé
+    // field_27 = RandoVisite Rando lieu
+    // field_28 = RandoVisite Rando participants
+    // field_29 = RandoVisite Visite lieu
+    // field_30 = RandoVisite Visite descriptif
+    // field_31 = RandoVisite Visite participants
+    // field_32 = Vélo distance
+    // field_33 = Vélo durée
+    // field_34 = Vélo dénivelé
+    // field_35 = Vélo participants
+    // field_36 = Vélo commentaires
+    // field_50 = Déplacements distance
+    // field_51 = Bénévolat temps
+
+    const date      = gs('field_3');   // "2026-01-02T23:00:00Z"
+    const categorie = gs('field_4');   // "Activité Copains Baladeurs"
+    const typeAct   = gs('field_5');   // "Marche Nordique"
+    const groupe    = gs('field_17');  // "Bleu" / "Vert" / "Rouge"
+
+    const typeNorm = typeAct.toLowerCase();
+    let distance = 0, denivele = 0, participants = 0, partRando = 0, difficulte = '';
+
+    if (typeNorm.includes('nordique')) {
+      distance     = gn('field_18');
+      denivele     = gn('field_19');
+      participants = gn('field_20');
+    } else if (typeNorm.includes('animation') || (typeNorm.includes('rand') && !typeNorm.includes('visite'))) {
+      distance     = gn('field_6');
+      denivele     = gn('field_8');
+      participants = gn('field_10');
+      difficulte   = gs('field_9');
+    } else if (typeNorm.includes('b\u00e2ton') || typeNorm.includes('baton')) {
+      distance     = gn('field_14');
+      participants = gn('field_13');
+    } else if (typeNorm.includes('v\u00e9lo') || typeNorm.includes('velo') || typeNorm.includes('lotourisme')) {
+      distance     = gn('field_32');
+      denivele     = gn('field_34');
+      participants = gn('field_35');
+    } else if (typeNorm.includes('visite') || typeNorm.includes('culturel') || typeNorm.includes('randovisite')) {
+      distance     = gn('field_24');
+      denivele     = gn('field_26');
+      participants = gn('field_31');   // participants à la visite (indicateur principal)
+      partRando    = gn('field_28');   // participants à la randonnée associée
+    }
+
+    return {
+      type:        typeAct,
+      categorie:   categorie,
+      date:        date,
+      groupe:      groupe,
+      distance,
+      denivele,
+      participants,
+      benevolat:   gn('field_51'),
+      deplacement: gn('field_50'),
+      difficulte,
+      partRando,
+      duree:       typeNorm.includes('animation') ? gn('field_7') : 0,
+      annulee:     f.Annulee === true,
+      coanim:      f.Coanimation === true,
+      fields:      f,
+    };
+  });
+
+  // ── Filtre par période (année civile ou 12 mois glissants) ──
+  // filtered : toutes les lignes de la période → sert au bénévolat et aux déplacements
+  const filtered = filterByPeriode(rows);
+
+  // stats : lignes prises en compte pour les activités.
+  // On écarte les sorties annulées (case « Annulée ») et les lignes du co-animateur
+  // (case « Co-animation ») : la séance est déjà comptée par l'animateur principal.
+  // Leurs heures de bénévolat et leurs km restent comptés (via filtered).
+  const stats = filtered.filter(r => !r.annulee && !r.coanim);
+
+  const randoRows  = stats.filter(isRando);
+  const nordicRows = stats.filter(isNordic);
+  const batonRows  = stats.filter(isBaton);
+  const veloRows   = stats.filter(isVelo);
+  const cultRows   = stats.filter(isCult);
+  const vieRows    = filtered.filter(isVie);
+
+  // ── Déduplification séances nordique (date+type unique) ──
+  const nordicDates = [...new Set(nordicRows.map(r => r.date.slice(0,10)))];
+  const randoDates  = [...new Set(randoRows.map(r => r.date.slice(0,10)))];
+  const batonDates  = [...new Set(batonRows.map(r => r.date.slice(0,10)))];
+  const veloDates   = [...new Set(veloRows.map(r => r.date.slice(0,10)))];
+  const cultDates   = [...new Set(cultRows.map(r => r.date.slice(0,10)))];
+
+  // ── Sous-groupes Nordique ──
+  const nVert  = nordicRows.filter(r => /vert/i.test(r.groupe));
+  const nBleu  = nordicRows.filter(r => /bleu/i.test(r.groupe));
+  const nRouge = nordicRows.filter(r => /rouge/i.test(r.groupe));
+  const nVertDates  = [...new Set(nVert.map(r => r.date.slice(0,10)))];
+  const nBleuDates  = [...new Set(nBleu.map(r => r.date.slice(0,10)))];
+  const nRougeDates = [...new Set(nRouge.map(r => r.date.slice(0,10)))];
+
+  const sum = (arr, key) => arr.reduce((s,r) => s + (r[key]||0), 0);
+  // Moyenne fiable : uniquement sur les lignes où la valeur est renseignée (> 0)
+  const avgPos = (arr, key) => { const v = arr.filter(r => (r[key]||0) > 0); return v.length ? sum(v,key)/v.length : 0; };
+  const fmtH = h => { if (!h) return '—'; let hh = Math.floor(h), mm = Math.round((h-hh)*60); if (mm===60){hh++;mm=0;} return hh+'h'+String(mm).padStart(2,'0'); };
+
+  // ── GLOBALE ──
+  const totalDist  = sum(randoRows,'distance') + sum(nordicRows,'distance') + sum(veloRows,'distance') + sum(cultRows,'distance');
+  const totalDeniv = sum(randoRows,'denivele') + sum(nordicRows,'denivele') + sum(veloRows,'denivele') + sum(cultRows,'denivele');
+  const totalJours = new Set([...nordicDates,...randoDates,...batonDates,...veloDates,...cultDates]).size;
+  const totalBenev = sum(filtered,'benevolat');
+  const totalParticNordic = sum(nordicDates.map(d => {
+    const dayRows = nordicRows.filter(r => r.date.slice(0,10) === d);
+    return {participants: sum(dayRows,'participants')};
+  }), 'participants');
+  const totalParticRando  = sum(randoRows,'participants');
+  const totalParticBaton  = sum(batonRows,'participants');
+  const totalParticVelo   = sum(veloRows,'participants');
+  const totalParticCult   = sum(cultRows,'participants');
+
+  // ── Mise à jour KPIs globaux ──
+  setText('k-jours',  totalJours + '<span class="kunit"> jours</span>');
+  setText('k-dist',   fmt(totalDist) + '<span class="kunit"> km</span>');
+  setText('k-deniv',  fmt(totalDeniv) + '<span class="kunit"> m</span>');
+  setText('k-benev',  fmt(totalBenev) + '<span class="kunit"> h</span>');
+  setText('k-nordic-s', nordicRows.length + '<span class="kunit"> séances</span>');
+  setText('k-rando-s',  randoRows.length  + '<span class="kunit"> sorties</span>');
+  setText('k-baton-s',  batonRows.length  + '<span class="kunit"> séances</span>');
+  setText('k-velo-s',   veloRows.length   + '<span class="kunit"> sorties</span>');
+  setText('k-cult-s',   cultRows.length > 0 ? cultRows.length + '<span class="kunit"> sorties</span>' : '—');
+
+  // ── RANDONNÉE KPIs ──
+  const rDistT  = sum(randoRows,'distance');
+  const rDenivT = sum(randoRows,'denivele');
+  const rPartT  = sum(randoRows,'participants');
+  const rNb     = randoRows.length;   // 1 ligne = 1 sortie (co-animations et annulations écartées)
+  setText('r-sorties',   rNb      + '<span class="kunit"> sorties</span>');
+  setText('r-dist',      fmt(rDistT)  + '<span class="kunit"> km</span>');
+  setText('r-deniv',     fmt(rDenivT) + '<span class="kunit"> m</span>');
+  setText('r-partic',    rPartT   + '<span class="kunit"> pers.</span>');
+  setText('r-moy',       (rNb ? Math.round(avgPos(randoRows,'participants')) : '—') + '<span class="kunit"> moy.</span>');
+  setText('r-dist-moy',  (rNb ? avgPos(randoRows,'distance').toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
+  setText('r-deniv-moy', (rNb ? Math.round(avgPos(randoRows,'denivele')) : '—') + '<span class="kunit"> m</span>');
+  setText('r-duree-moy', fmtH(avgPos(randoRows,'duree')));
+
+  // Difficulté randonnée
+  const diffCount = {};
+  randoRows.forEach(r => { const d = r.difficulte || 'Autre'; diffCount[d] = (diffCount[d]||0)+1; });
+  const tfN = diffCount['Très facile'] || diffCount['Tres facile'] || diffCount['TF'] || 0;
+  const faN = diffCount['Facile'] || diffCount['F'] || 0;
+  const moN = diffCount['Moyen'] || diffCount['M'] || 0;
+  const diN = diffCount['Difficile'] || diffCount['D'] || 0;
+  setText('r-pct-facile', rNb ? Math.round((faN/rNb)*100) + ' %' : '—');
+  document.getElementById('r-diff-badges').innerHTML =
+    `<span class="dbadge tf">Très facile · ${tfN}</span>
+     <span class="dbadge fa">Facile · ${faN}</span>
+     <span class="dbadge mo">Moyen · ${moN}</span>
+     <span class="dbadge di">Difficile · ${diN}</span>`;
+
+  // ── NORDIQUE KPIs ──
+  const nDistT  = sum(nordicRows,'distance');
+  const nDenivT = sum(nordicRows,'denivele');
+  const nPartT  = totalParticNordic;
+  // Moyenne participants par journée = total participants / nombre de journées (dates)
+  const nMoyParSeance = nordicDates.length
+    ? (nordicDates.reduce((s, d) => {
+        const dayRows = nordicRows.filter(r => r.date.slice(0,10) === d);
+        return s + sum(dayRows,'participants');
+      }, 0) / nordicDates.length)
+    : 0;
+  // 1 ligne = 1 séance d'un groupe (un samedi peut compter plusieurs groupes, voire deux groupes de même couleur)
+  setText('n-seances', nordicRows.length + '<span class="kunit"> séances</span>');
+  setText('n-seances-lbl', 'Séances (tous groupes) · sur ' + nordicDates.length + ' journées');
+  setText('n-dist',    fmt(nDistT)  + '<span class="kunit"> km</span>');
+  setText('n-deniv',   fmt(nDenivT) + '<span class="kunit"> m</span>');
+  setText('n-partic',  nPartT + '<span class="kunit"> pers.</span>');
+
+  // Par groupe — 1 ligne = 1 séance du groupe
+  const groupStats = (rows, dates) => ({
+    seances: rows.length,
+    distMoy: avgPos(rows,'distance'),
+    denivMoy: avgPos(rows,'denivele'),
+    partMoy: avgPos(rows,'participants'),
+  });
+  const gV = groupStats(nVert,  nVertDates);
+  const gB = groupStats(nBleu,  nBleuDates);
+  const gR = groupStats(nRouge, nRougeDates);
+
+  const setGroup = (pfx, g) => {
+    setText(pfx+'-seances', g.seances + '<span style="font-size:11px;font-weight:600;opacity:.6"> séances</span>');
+    setText(pfx+'-dist',    g.distMoy.toFixed(1).replace('.',',') + '<span style="font-size:11px;font-weight:600;opacity:.6"> km</span>');
+    setText(pfx+'-deniv',   Math.round(g.denivMoy) + '<span style="font-size:11px;font-weight:600;opacity:.6"> m</span>');
+    setText(pfx+'-part',    g.partMoy.toFixed(1).replace('.',',') + '<span style="font-size:11px;font-weight:600;opacity:.6"> pers./séance</span>');
+  };
+  setGroup('nG', gV);
+  setGroup('nB', gB);
+  setGroup('nR', gR);
+  document.getElementById('badge-nG').textContent = gV.seances;
+  document.getElementById('badge-nB').textContent = gB.seances;
+  document.getElementById('badge-nR').textContent = gR.seances;
+  setText('n-moy', Math.round(nMoyParSeance) + '<span class="kunit"> moy.</span>');
+
+  // ── BÂTONS KPIs ──
+  const bPartT = sum(batonRows,'participants');
+  setText('b-seances', batonRows.length + '<span class="kunit"> séances</span>');
+  setText('b-partic',  bPartT + '<span class="kunit"> pers.</span>');
+  setText('b-moy', (batonRows.length ? Math.round(avgPos(batonRows,'participants')) : '—') + '<span class="kunit"> moy.</span>');
+
+  // ── VÉLO KPIs ──
+  const vDistT = sum(veloRows,'distance');
+  const vPartT = sum(veloRows,'participants');
+  const vNb    = veloRows.length;
+  const vMoy   = vNb ? Math.round(avgPos(veloRows,'participants')) : '—';
+  setText('v-sorties-k', vNb + '<span class="kunit"> sorties</span>');
+  setText('v-dist',      fmt(vDistT) + '<span class="kunit"> km</span>');
+  setText('v-partic',    vPartT + '<span class="kunit"> pers.</span>');
+  setText('v-dist-moy',  (vNb ? avgPos(veloRows,'distance').toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
+  const vMoyEl = document.getElementById('v-moy');
+  if (vMoyEl) setText('v-moy', vMoy + '<span class="kunit"> moy.</span>');
+
+  // ── SORTIES CULTURELLES KPIs ──
+  const cultDistT  = sum(cultRows,'distance');
+  const cultDenivT = sum(cultRows,'denivele');
+  const cultPartT  = sum(cultRows,'participants');
+  const cultMoy    = cultRows.length ? Math.round(avgPos(cultRows,'participants')) : '—';
+  setText('c-sorties', cultRows.length + '<span class="kunit"> sorties</span>');
+  setText('c-dist',    fmt(cultDistT)  + '<span class="kunit"> km</span>');
+  setText('c-deniv',   fmt(cultDenivT) + '<span class="kunit"> m</span>');
+  setText('c-partic',  cultPartT + '<span class="kunit"> pers.</span>');
+  setText('c-moy', cultMoy + '<span class="kunit"> moy.</span>');
+  setText('c-partic-rando', sum(cultRows,'partRando') + '<span class="kunit"> pers.</span>');
+  setText('c-dist-moy', (cultRows.length ? avgPos(cultRows,'distance').toFixed(1).replace('.',',') : '—') + '<span class="kunit"> km</span>');
+
+  // ── Rendu détail sorties culturelles ──
+  const cultList = document.getElementById('cult-sorties-list');
+  if (cultList) {
+    if (cultRows.length === 0) {
+      cultList.innerHTML = `<div class="card"><div class="cult-empty">
+        <span class="cult-ico">🗺</span>
+        <h3>Aucune sortie culturelle saisie</h3>
+        <p>Les sorties culturelles apparaîtront ici automatiquement une fois saisies dans la Microsoft List.</p>
+      </div></div>`;
+    } else {
+      // Récupérer les données brutes pour afficher le détail
+      // Chaque fiche lit les champs de SA ligne (et non la première ligne trouvée à la même date)
+      const cultRaw = cultRows.slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      cultList.innerHTML = cultRaw.map(r => {
+        const ff = r.fields || {};
+        const dateStr = r.date ? new Date(r.date).toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'}) : '—';
+        // Mapping confirmé par debug console :
+        // field_23 = descriptif général
+        // field_24 = distance rando
+        // field_26 = dénivelé rando
+        // field_27 = lieu rando
+        // field_28 = participants rando
+        // field_29 = lieu visite
+        // field_30 = descriptif visite
+        // field_31 = participants visite
+        const lieuVisite   = escHtml(ff.field_29 || '—');
+        const descVisite   = escHtml(ff.field_30 || '');
+        const partVisite   = escHtml(ff.field_31 || '—');
+        const lieuRando    = escHtml(ff.field_27 || '—');
+        const distRando    = String(r.distance).replace('.',',');
+        const denivRando   = Math.round(r.denivele);
+        const partRando    = escHtml(ff.field_28 || '—');
+        const descriptif   = escHtml(ff.field_23 || '');
+        return `
+        <div class="card" style="margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+            <div style="font-size:28px">🏛</div>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:16px;color:var(--sp-dk)">${lieuVisite}</div>
+              <div style="font-size:12px;color:var(--txt-l);margin-top:2px">📅 ${dateStr}</div>
+            </div>
+          </div>
+          ${descriptif ? `<div style="font-size:12px;color:var(--txt);margin-bottom:12px;font-style:italic;background:var(--gris-cl);padding:8px 12px;border-radius:6px">${descriptif}</div>` : ''}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div>
+              <div class="cult-col-hdr">🏛 Visite</div>
+              ${descVisite ? `<div class="cult-field"><span class="cult-field-ico">📝</span><span class="cult-field-lbl">Descriptif</span><span class="cult-field-val">${descVisite}</span></div>` : ''}
+              <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${partVisite}</span></div>
+            </div>
+            <div>
+              <div class="cult-col-hdr">🥾 Randonnée associée</div>
+              <div class="cult-field"><span class="cult-field-ico">📍</span><span class="cult-field-lbl">Lieu</span><span class="cult-field-val">${lieuRando}</span></div>
+              <div class="cult-field"><span class="cult-field-ico">📏</span><span class="cult-field-lbl">Distance</span><span class="cult-field-val">${distRando} km</span></div>
+              <div class="cult-field"><span class="cult-field-ico">⛰</span><span class="cult-field-lbl">Dénivelé</span><span class="cult-field-val">${denivRando} m</span></div>
+              <div class="cult-field"><span class="cult-field-ico">👥</span><span class="cult-field-lbl">Participants</span><span class="cult-field-val">${partRando}</span></div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+  setText('vie-actions',  vieRows.length + '<span class="kunit"> actions</span>');
+  setText('vie-benev-h',  fmt(sum(vieRows,'benevolat')) + '<span class="kunit"> h</span>');
+  setText('vie-km-asso',  fmt(sum(vieRows,'deplacement')) + '<span class="kunit"> km</span>');
+  setText('vie-km-total', fmt(sum(filtered,'deplacement')) + '<span class="kunit"> km</span>');
+
+  // ── Données par mois (selon période sélectionnée) ──
+  const mLabels = getMonthLabels();
+
+  const rPartMonth  = byMonthPeriode(randoRows,'participants');
+  const cPartMonth  = byMonthPeriode(cultRows,'participants');
+  const nVertMonth  = byMonthPeriode(nVert,'participants');
+  const nBleuMonth  = byMonthPeriode(nBleu,'participants');
+  const nRougeMonth = byMonthPeriode(nRouge,'participants');
+  const bPartMonth  = byMonthPeriode(batonRows,'participants');
+  // Moyenne par séance et par mois : séances sans participants saisis écartées ; mois sans séance = vide
+  const bPos = batonRows.filter(r => r.participants > 0).map(r => ({...r, une: 1}));
+  const bPartPos = byMonthPeriode(bPos,'participants'), bNbPos = byMonthPeriode(bPos,'une');
+  const bMoyMonth = bNbPos.map((n,i) => n ? Math.round(bPartPos[i]/n*10)/10 : null);
+  const vPartMonth  = byMonthPeriode(veloRows,'participants');
+  const nPartMonth  = mLabels.map((_,i) => (nVertMonth[i]||0)+(nBleuMonth[i]||0)+(nRougeMonth[i]||0));
+
+  const rDistMonth  = byMonthPeriode(randoRows,'distance');
+  const rDenivMonth = byMonthPeriode(randoRows,'denivele');
+
+  // ── Graphiques ──
+  rebuildCharts({
+    totalParticNordic, totalParticRando, totalParticBaton, totalParticVelo, totalParticCult,
+    rDistT, nDistT, vDistT, cultDistT, rDenivT, nDenivT, vDenivT: sum(veloRows,'denivele'), cultDenivT,
+    rPartMonth, cPartMonth, nVertMonth, nBleuMonth, nRougeMonth, nPartMonth, bPartMonth, vPartMonth,
+    rDistMonth, rDenivMonth, bMoyMonth,
+    gV, gB, gR,
+    tfN, faN, moN, diN,
+    batonRows, veloRows, filtered,
+    vieRows, mLabels,
+  });
+
+  // ── Label période ──
+  const now2 = new Date();
+  let periodeStr;
+  if (currentPeriode === 'civil') {
+    periodeStr = `Année ${now2.getFullYear()}`;
+  } else {
+    // 12 mois glissants : début = premier jour du mois suivant il y a 12 mois
+    const start12 = new Date(now2.getFullYear() - 1, now2.getMonth() + 1, 1);
+    const end12   = new Date(now2.getFullYear(), now2.getMonth() + 1, 0); // dernier jour du mois courant
+    const fmtDate = (d) => d.toLocaleDateString('fr-FR', {month:'short', year:'numeric'});
+    periodeStr = `${fmtDate(start12)} – ${fmtDate(end12)}`;
+  }
+
+  // Mettre à jour footer et sous-titres
+  const footerEl = document.getElementById('footer-global');
+  if (footerEl) footerEl.textContent = `Copains Baladeurs · FFRandonnée · Données SharePoint · ${periodeStr}`;
+  const footerVie = document.getElementById('footer-vie');
+  if (footerVie) footerVie.textContent = `Copains Baladeurs · FFRandonnée · Données SharePoint · ${periodeStr}`;
+
+  // Sous-titres des onglets — textes de base fixes + période dynamique
+  const thLabels = {
+    'th-rando':  'Sorties pédestres',
+    'th-nordic': 'Marche Nordique · 3 groupes',
+    'th-baton':  'Séances de gym avec bâtons',
+    'th-velo':   'Sorties à vélo',
+    'th-cult':   'Visites patrimoine & découvertes',
+    'th-vie':    'Tâches, réunions, bénévolat',
+  };
+  Object.entries(thLabels).forEach(([id, label]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${label} · ${periodeStr}`;
+  });
+
+  document.getElementById('h-subtitle').textContent =
+    `Tableau de bord · ${periodeStr} · ${filtered.length} enregistrements · données en temps réel`;
+}
+
+// ══════════════════════════════════════════
+//  CONSTRUCTION DES GRAPHIQUES
+// ══════════════════════════════════════════
+function rebuildCharts(d) {
+  destroyAll();
+
+  // ── GLOBALE ──
+  mk('g-partic','bar',{
+    labels:['Nordique','Randonnée','Bâtons','Vélo','Culturel'],
+    datasets:[{data:[d.totalParticNordic,d.totalParticRando,d.totalParticBaton,d.totalParticVelo,d.totalParticCult],
+      backgroundColor:[C.g1,C.g2,C.g3,C.g6,C.nB],borderRadius:5}]
+  },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:OY,y:{grid:{display:false}}}});
+
+  mk('g-donut','doughnut',{
+    labels:['Nordique','Randonnée','Bâtons','Vélo','Culturel'],
+    datasets:[{data:[d.totalParticNordic,d.totalParticRando,d.totalParticBaton,d.totalParticVelo,d.totalParticCult],
+      backgroundColor:[C.g1,C.g2,C.g3,C.g6,C.nB],borderWidth:2,borderColor:'#fff'}]
+  },{cutout:'58%',plugins:{legend:{position:'bottom'}}});
+
+  mk('g-dist','bar',{
+    labels:['Nordique','Randonnée','Vélo','Culturel'],
+    datasets:[
+      {label:'Distance (km)',    data:[d.nDistT,d.rDistT,d.vDistT,d.cultDistT],   backgroundColor:[a(C.g1,.8),a(C.g2,.8),a(C.g6,.8),a(C.nB,.8)], borderRadius:4,yAxisID:'y'},
+      {label:'Dénivelé (/100m)',data:[d.nDenivT/100,d.rDenivT/100,d.vDenivT/100,d.cultDenivT/100],backgroundColor:[a(C.g3,.7),a(C.g3,.5),a(C.g3,.3),a(C.g3,.3)],borderRadius:4,yAxisID:'y1'},
+    ]
+  },{plugins:{legend:{position:'bottom'}},scales:{
+    x:OX,
+    y:{...OY,position:'left',title:{display:true,text:'km',font:{size:10}}},
+    y1:{...OY,position:'right',grid:{display:false},title:{display:true,text:'dénivelé/100m',font:{size:10}}}
+  }});
+
+  mk('g-partic-month','bar',{labels:d.mLabels,datasets:[
+    {label:'Nordique',  data:d.nPartMonth,  backgroundColor:C.g1,borderRadius:3},
+    {label:'Randonnée', data:d.rPartMonth,  backgroundColor:C.g2,borderRadius:3},
+    {label:'Bâtons',    data:d.bPartMonth,  backgroundColor:C.g3,borderRadius:3},
+    {label:'Vélo',      data:d.vPartMonth,  backgroundColor:C.g6,borderRadius:3},
+    {label:'Culturel',  data:d.cPartMonth,  backgroundColor:C.nB,borderRadius:3},
+  ]},{plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true,...OX},y:{stacked:true,...OY}}});
+
+  // ── RANDONNÉE ──
+  mk('r-partic-month','bar',{labels:d.mLabels,datasets:[
+    {label:'Participants',data:d.rPartMonth,backgroundColor:C.g2,borderRadius:5}
+  ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
+
+  mk('r-diff','doughnut',{
+    labels:['Très facile','Facile','Moyen','Difficile'],
+    datasets:[{data:[d.tfN,d.faN,d.moN,d.diN],
+      backgroundColor:[C.g4,C.g1,C.g2,C.g6],borderWidth:2,borderColor:'#fff'}]
+  },{cutout:'55%',plugins:{legend:{display:false}}});
+
+  mk('r-dist-deniv','bar',{labels:d.mLabels,datasets:[
+    {label:'Distance (km)',    data:d.rDistMonth,                                      backgroundColor:a(C.g2,.75),borderRadius:4,yAxisID:'y'},
+    {label:'Dénivelé (/10m)', data:d.rDenivMonth.map(v=>Math.round(v/10)),            backgroundColor:a(C.g3,.7), borderRadius:4,yAxisID:'y1'},
+  ]},{plugins:{legend:{position:'bottom'}},scales:{
+    x:OX,
+    y:{...OY,position:'left',title:{display:true,text:'km',font:{size:10}}},
+    y1:{...OY,position:'right',grid:{display:false},title:{display:true,text:'dénivelé/10m',font:{size:10}}}
+  }});
+
+  // ── NORDIQUE — ordre Vert / Bleu / Rouge ──
+  mk('n-partic-month','bar',{labels:d.mLabels,datasets:[
+    {label:'🟢 Vert (Débutants)',  data:d.nVertMonth,  backgroundColor:C.nG,borderRadius:3},
+    {label:'🔵 Bleu (Interméd.)', data:d.nBleuMonth,  backgroundColor:C.nB,borderRadius:3},
+    {label:'🔴 Rouge (Confirmés)',data:d.nRougeMonth, backgroundColor:C.nR,borderRadius:3},
+  ]},{plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true,...OX},y:{stacked:true,...OY}}});
+
+  mk('n-donut','doughnut',{
+    labels:['Vert · Débutants','Bleu · Interméd.','Rouge · Confirmés'],
+    datasets:[{data:[d.gV.seances,d.gB.seances,d.gR.seances],
+      backgroundColor:[C.nG,C.nB,C.nR],borderWidth:2,borderColor:'#fff'}]
+  },{cutout:'58%',plugins:{legend:{display:false}}});
+
+  // ── BÂTONS ──
+  mk('b-partic-month','bar',{labels:d.mLabels,datasets:[
+    {label:'Participants',data:d.bPartMonth,backgroundColor:C.g3,borderRadius:5}
+  ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
+
+  mk('b-moy-month','line',{labels:d.mLabels,datasets:[
+    {label:'Participants / séance',data:d.bMoyMonth,borderColor:C.g3,backgroundColor:a(C.g3,.15),fill:true,tension:.3,spanGaps:true,pointRadius:4,pointBackgroundColor:C.g3}
+  ]},{plugins:{legend:{display:false}},scales:{x:OX,y:{...OY,title:{display:true,text:'pers. / séance',font:{size:10}}}}});
+
+  // ── VÉLO ──
+  mk('v-partic-month','bar',{labels:d.mLabels,datasets:[
+    {label:'Participants',data:d.vPartMonth,backgroundColor:C.g6,borderRadius:5}
+  ]},{plugins:{legend:{display:false}},scales:{x:OX,y:OY}});
+
+  // Participants par sortie vélo
+  const veloParticBySortie = d.veloRows.slice().sort((x,y)=>x.date.localeCompare(y.date)).map(r => ({
+    lbl: new Date(r.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}),
+    val: r.participants
+  }));
+  mk('v-sorties','bar',{
+    labels: veloParticBySortie.map(x=>x.lbl),
+    datasets:[{data: veloParticBySortie.map(x=>x.val),
+      backgroundColor:[C.g1,C.g2,C.g3,C.g6,C.g4],borderRadius:5}]
+  },{plugins:{legend:{display:false}},scales:{x:OX,y:{...OY,ticks:{stepSize:5}}}});
+
+  // ── VIE ASSO ──
+  const typeLabels=['Nordique','Randonnée','Vie asso','Bâtons','Vélo','Culturel','Autre'];
+  const vieBenevData = [
+    d.filtered.filter(isNordic).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isRando).reduce((s,r)=>s+r.benevolat,0),
+    d.vieRows.reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isBaton).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isVelo).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isCult).reduce((s,r)=>s+r.benevolat,0),
+    d.filtered.filter(isAutre).reduce((s,r)=>s+r.benevolat,0),
+  ];
+  const vieKmData = [
+    d.filtered.filter(isNordic).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isRando).reduce((s,r)=>s+r.deplacement,0),
+    d.vieRows.reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isBaton).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isVelo).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isCult).reduce((s,r)=>s+r.deplacement,0),
+    d.filtered.filter(isAutre).reduce((s,r)=>s+r.deplacement,0),
+  ];
+
+  mk('vie-benev','bar',{labels:typeLabels,datasets:[
+    {data:vieBenevData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.nB,C.g5],borderRadius:5}
+  ]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,title:{display:true,text:'heures',font:{size:10}}},y:{grid:{display:false}}}});
+
+  mk('vie-km','bar',{labels:typeLabels,datasets:[
+    {data:vieKmData,backgroundColor:[C.g1,C.g2,C.g6,C.g3,C.g4,C.nB,C.g5],borderRadius:5}
+  ]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...OY,title:{display:true,text:'km',font:{size:10}}},y:{grid:{display:false}}}});
+}
+
+// ══════════════════════════════════════════
+//  UTILITAIRES
+// ══════════════════════════════════════════
+function mk(id, type, data, options={}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  allCharts[id] = new Chart(el, { type, data, options: { responsive:true, ...options } });
+}
+function destroyAll() {
+  Object.values(allCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+  allCharts = {};
+}
+function setText(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+function fmt(n) {
+  return Math.round(n).toLocaleString('fr-FR');
+}
+function showLoading(msg, sub) {
+  const o = document.getElementById('loading-overlay');
+  o.style.display = 'flex';
+  document.getElementById('loading-msg').textContent = msg || 'Chargement…';
+  document.getElementById('loading-sub').textContent = sub || '';
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+function setAuthConnected(count) {
+  const bar = document.getElementById('auth-bar');
+  bar.className = 'connected';
+  document.getElementById('auth-status-text').textContent =
+    `Connecté — ${count} enregistrements chargés depuis SharePoint`;
+  document.getElementById('btn-connect').style.display = 'none';
+  document.getElementById('btn-refresh').style.display = 'inline-block';
+  document.getElementById('periode-toggle').style.display = 'flex';
+  const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('last-update').textContent = `Mis à jour à ${now}`;
+
+  // Rafraîchissement automatique toutes les 10 minutes
+  if (window._autoRefreshTimer) clearInterval(window._autoRefreshTimer);
+  window._autoRefreshTimer = setInterval(() => {
+    loadData(null, true);
+  }, 10 * 60 * 1000);
+}
+
+function setAuthError(msg) {
+  const bar = document.getElementById('auth-bar');
+  bar.className = 'error';
+  if (window._autoRefreshTimer) { clearInterval(window._autoRefreshTimer); window._autoRefreshTimer = null; }
+  // Message d'accès refusé propre
+  const isAuthError = /interaction|login|account|AADS/i.test(msg);
+  document.getElementById('auth-status-text').textContent = isAuthError
+    ? 'Accès réservé aux membres Copains Baladeurs'
+    : 'Erreur : ' + msg;
+  document.getElementById('btn-connect').style.display = 'inline-block';
+  document.getElementById('btn-connect').disabled = false;
+  // Cacher l'overlay et afficher le dashboard vide
+  hideLoading();
+}
+
+function nav(btn, id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('on'));
+  document.getElementById('pg-' + id).classList.add('on');
+  btn.classList.add('on');
+}
+
+// ══════════════════════════════════════════
+//  DÉMARRAGE
+// ══════════════════════════════════════════
+
+// Attendre que MSAL v2 soit chargé puis init (max ~6 s)
+(function waitForMsal(n) {
+  if (window.msal && window.msal.PublicClientApplication) {
+    initMsal();
+  } else if (n > 0) {
+    setTimeout(() => waitForMsal(n - 1), 300);
+  }
+})(20); // 20 × 300 ms
+</script>
+</body>
+</html>
