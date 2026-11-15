@@ -834,7 +834,7 @@ function processAndRender(items) {
   const fmtH = h => { if (!h) return '—'; let hh = Math.floor(h), mm = Math.round((h-hh)*60); if (mm===60){hh++;mm=0;} return hh+'h'+String(mm).padStart(2,'0'); };
 
   // ── GLOBALE ──
-  const totalDist  = sum(randoRows,'distance') + sum(nordicRows,'distance') + sum(veloRows,'distance') + sum(cultRows,'distance');
+  const totalDist  = sum(randoRows,'distance') + sum(nordicRows,'distance') + sum(batonRows,'distance') + sum(veloRows,'distance') + sum(cultRows,'distance'); // bâtons ajoutés (oubli corrigé le 15/11/2026)
   const totalDeniv = sum(randoRows,'denivele') + sum(nordicRows,'denivele') + sum(veloRows,'denivele') + sum(cultRows,'denivele');
   const totalJours = new Set([...nordicDates,...randoDates,...batonDates,...veloDates,...cultDates]).size;
   const totalBenev = sum(filtered,'benevolat');
